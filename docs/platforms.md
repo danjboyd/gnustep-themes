@@ -39,11 +39,16 @@ Nothing in this document enables editing anywhere it is not already enabled.
   - The conflict check is optimistic, not a compare-and-swap: a same-key
     write by another process inside the window is overwritten, and a test
     pins that.
-  - A `-synchronize` failure means the outcome is unknown. The edit session
-    then requires a reload before any further Apply (`GTSErrorNeedsReload`).
-* **Live apply:** `Apply = live` only describes what a theme does *in its
-  own process*. No cross-process notification is posted, and propagation to
-  other running apps is unproven.
+  - Two separate outcomes. A `-synchronize` failure leaves the outcome
+    unknown (`GTSErrorWriteFailed`; the edits stay staged). A save that
+    succeeded but could not be re-read gives a receipt with `refreshFailed`
+    (the edits are unstaged). Both set `needsRebase`, and further Applies
+    are refused with `GTSErrorNeedsReload` until a successful rebase.
+* **Live apply:** the supported design scope of `Apply = live` is a theme
+  reacting inside its own process, as declared by the theme owner. That is a
+  scope, not a result: no theme redraw has been demonstrated (the example
+  themes are metadata only). No cross-process notification is posted, and
+  propagation to other running apps is unproven.
 * **Header/runtime pairing:** apps and tests are built against, and run on,
   the same Debian packages. A theme binary built for a different libs-gui
   (e.g. the NSTextAlignment renumbering the adwaita owner attributes to

@@ -53,9 +53,20 @@ GTSThemeSettingsEditor *editor = [[GTSThemeSettingsEditor alloc] initWithModel: 
 * **Gap to close before a SystemPreferences pane:** expose the last receipt
   on the model (`-lastApplyReceipt`), so a host can decide for itself (for
   example by offering "Restart now"). Hosts must not parse message text.
-* An unknown save outcome (`GTSErrorWriteFailed`) or a refresh failure
-  leaves the session needing a reload. The editor's Reload button handles
-  this, and the host must not re-apply the change on its own.
+* Two distinct post-Apply failure outcomes. The current API keeps them
+  apart, and hosts must too:
+  1. **Write outcome unknown:** `-applyWithConflicts:error:` returns nil
+     with `GTSErrorWriteFailed`. The save may or may not have reached disk.
+     The edits stay staged and `needsRebase` is YES.
+  2. **Saved, but refresh failed:** Apply returns a receipt with
+     `refreshFailed` YES. The save succeeded and the edits are unstaged. The
+     baseline is the old baseline plus what was written, and `needsRebase`
+     is YES.
+
+  In both cases any further Apply is refused with `GTSErrorNeedsReload`
+  until `-rebaseWithError:` succeeds. In case 1 the rebase unstages
+  whatever did reach disk. The editor's Reload button does that rebase,
+  and the host must not re-apply anything on its own.
 * Live settings: when the pane edits its own domain, the receipt says it was
   saved and that live application is *unconfirmed*. Whether the host's own
   `standardUserDefaults` reflects the change and the theme redraws has not
