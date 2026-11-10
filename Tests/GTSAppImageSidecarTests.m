@@ -187,6 +187,85 @@ inlineGumdrop(void)
   XCTAssertEqual([err code], (NSInteger)GTSErrorInvalidSchema);
 }
 
+- (void) testSchemaMustBeTheInteger1
+{
+  NSArray *bad = [NSArray arrayWithObjects: [NSNumber numberWithBool: YES],
+    [NSNumber numberWithDouble: 1.5], @"1", [NSNumber numberWithInt: 0], [NSNull null], nil];
+  NSEnumerator *e = [bad objectEnumerator];
+  id v;
+  while ((v = [e nextObject]) != nil)
+    {
+      NSMutableDictionary *d = [self sidecarFor: [appimage lastPathComponent] sha: GTSSHA256HexOfFile(appimage)];
+      [d setObject: v forKey: @"schema"];
+      [self writeSidecar: d];
+      XCTAssertNil([GTSAppImageSidecar sidecarWithContentsOfFile: sidecar error: NULL], @"schema %@", v);
+    }
+}
+
+- (void) testPathLikeFileNamesRejected
+{
+  NSArray *bad = [NSArray arrayWithObjects: @"", @".", @"..", @"a/b.AppImage", @"a\\b.AppImage",
+    @"x\n.AppImage", nil];
+  NSEnumerator *e = [bad objectEnumerator];
+  NSString *n;
+  while ((n = [e nextObject]) != nil)
+    {
+      [self writeSidecar: [self sidecarFor: n sha: GTSSHA256HexOfFile(appimage)]];
+      XCTAssertNil([GTSAppImageSidecar sidecarWithContentsOfFile: sidecar error: NULL], @"name %@", n);
+    }
+}
+
+- (void) testMalformedNestedTypesReadAsAbsent
+{
+  NSMutableDictionary *d = [self sidecarFor: [appimage lastPathComponent] sha: GTSSHA256HexOfFile(appimage)];
+  GTSAppImageSidecar *s;
+  [d setObject: @"not an object" forKey: @"app"];
+  [d setObject: [NSArray arrayWithObject: @"x"] forKey: @"defaults"];
+  [d setObject: [NSArray arrayWithObjects: @"just a string",
+    [NSDictionary dictionaryWithObjectsAndKeys: @"T", @"name", @"oops", @"installation",
+      [NSNumber numberWithInt: 3], @"themeId", @"also wrong", @"settings", nil], nil] forKey: @"themes"];
+  [self writeSidecar: d];
+  s = [GTSAppImageSidecar sidecarWithContentsOfFile: sidecar error: NULL];
+  XCTAssertNotNil(s, @"still bound to its AppImage");
+  XCTAssertNil([s runtimeDomainHint]);
+  XCTAssertEqualObjects([s runtimeDomainHintSource], @"unknown");
+  XCTAssertNil([s seededTheme]);
+  XCTAssertEqual([[s themes] count], (NSUInteger)1);
+  XCTAssertNil([[s themeNamed: @"T"] themeId], @"number is not an id");
+  XCTAssertNil([[s themeNamed: @"T"] bundledPath]);
+  XCTAssertEqual([[s themeNamed: @"T"] settingsStatus], GTSSettingsNone);
+  XCTAssertTrue([[s warnings] count] >= 1);
+
+  [d setObject: @"not a list" forKey: @"themes"];
+  [self writeSidecar: d];
+  s = [GTSAppImageSidecar sidecarWithContentsOfFile: sidecar error: NULL];
+  XCTAssertEqual([[s themes] count], (NSUInteger)0);
+  XCTAssertTrue([[s warnings] count] >= 1, @"a non-list is reported, not silently empty");
+}
+
+/* Streaming/final-block handling: compare against the system sha256sum
+   for sizes around the 64-byte block, the 56-byte padding limit and the
+   64 KiB read buffer. */
+- (void) testFileDigestMatchesSystemSha256sumAtBoundaries
+{
+  int sizes[] = { 0, 1, 55, 56, 57, 63, 64, 65, 119, 120, 127, 128, 65535, 65536, 65537, 131073 };
+  int i;
+  for (i = 0; i < (int)(sizeof sizes / sizeof sizes[0]); i++)
+    {
+      NSMutableData *d = [NSMutableData dataWithLength: sizes[i]];
+      unsigned char *b = [d mutableBytes];
+      NSString *f = [dir stringByAppendingPathComponent: [NSString stringWithFormat: @"blob%d", sizes[i]]];
+      GTSToolResult *r;
+      int k;
+      for (k = 0; k < sizes[i]; k++) b[k] = (unsigned char)(k * 31 + 7);
+      [d writeToFile: f atomically: YES];
+      r = GTSRunTool(@"/usr/bin/sha256sum", [NSArray arrayWithObject: f], 10);
+      XCTAssertEqual(r->status, 0);
+      XCTAssertEqualObjects(GTSSHA256HexOfFile(f), [r->output substringToIndex: 64], @"size %d", sizes[i]);
+      XCTAssertEqualObjects(GTSSHA256HexOfData(d), GTSSHA256HexOfFile(f), @"size %d", sizes[i]);
+    }
+}
+
 - (void) testUnknownRuntimeDomainIsNotGuessed
 {
   NSMutableDictionary *d = [self sidecarFor: [appimage lastPathComponent] sha: GTSSHA256HexOfFile(appimage)];

@@ -476,9 +476,24 @@ static NSArray *knownSources = nil;
   if (![plist isKindOfClass: [NSDictionary class]])
     FAIL(GTSErrorInvalidSchema, @"top level is not a dictionary");
   o = [plist objectForKey: @"SchemaVersion"];
-  if (o == nil || ![o respondsToSelector: @selector(intValue)])
+  if ([o isKindOfClass: [NSNumber class]])
+    {
+      /* JSON true/false and fractions are not versions. */
+      const char *ty = [o objCType];
+      if ((ty && (*ty == 'C' || *ty == 'c' || *ty == 'B')) || [o doubleValue] != (double)[o intValue])
+        FAIL(GTSErrorInvalidSchema, @"SchemaVersion is not an integer");
+      version = [o intValue];
+    }
+  else if ([o isKindOfClass: [NSString class]])
+    {
+      /* Old-style plists store numbers as strings: digits only. */
+      NSCharacterSet *nd = [[NSCharacterSet decimalDigitCharacterSet] invertedSet];
+      if ([o length] == 0 || [o rangeOfCharacterFromSet: nd].location != NSNotFound)
+        FAIL(GTSErrorInvalidSchema, @"SchemaVersion is not an integer");
+      version = [o intValue];
+    }
+  else
     FAIL(GTSErrorInvalidSchema, @"missing SchemaVersion");
-  version = [o intValue];
   if (version != 1)
     FAIL(GTSErrorUnsupportedVersion,
       ([NSString stringWithFormat: @"unsupported SchemaVersion %ld", (long)version]));

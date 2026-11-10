@@ -29,6 +29,32 @@ sidecarError(NSInteger code, NSString *msg)
     userInfo: [NSDictionary dictionaryWithObject: msg forKey: NSLocalizedDescriptionKey]];
 }
 
+/* An integer number exactly equal to n. JSON true/false arrive as NSNumber
+   too (objCType C/c/B on gnustep-base), and 1.5 has intValue 1: reject both. */
+static BOOL
+isInteger(id o, int n)
+{
+  const char *t;
+  if (![o isKindOfClass: [NSNumber class]]) return NO;
+  t = [o objCType];
+  if (t && (*t == 'C' || *t == 'c' || *t == 'B')) return NO;
+  return [o doubleValue] == (double)n;
+}
+
+/* A plain file name: no path separators, not "." or "..", no control chars. */
+static BOOL
+isPlainFileName(NSString *s)
+{
+  NSUInteger i;
+  if ([s length] == 0 || [s isEqual: @"."] || [s isEqual: @".."]) return NO;
+  for (i = 0; i < [s length]; i++)
+    {
+      unichar c = [s characterAtIndex: i];
+      if (c == '/' || c == '\\' || c < 0x20 || c == 0x7f) return NO;
+    }
+  return YES;
+}
+
 static BOOL
 isHex64(NSString *s)
 {
@@ -91,8 +117,7 @@ isHex64(NSString *s)
         [NSString stringWithFormat: @"%@ is not a JSON object", path]);
       return nil;
     }
-  if (![[json objectForKey: @"schema"] isKindOfClass: [NSNumber class]]
-    || [[json objectForKey: @"schema"] intValue] != 1)
+  if (!isInteger([json objectForKey: @"schema"], 1))
     {
       if (error) *error = sidecarError(GTSErrorUnsupportedVersion,
         [NSString stringWithFormat: @"%@: unsupported sidecar schema %@", path,
@@ -100,8 +125,7 @@ isHex64(NSString *s)
       return nil;
     }
   ai = dict([json objectForKey: @"appimage"]);
-  if (str([ai objectForKey: @"fileName"]) == nil || !isHex64(str([ai objectForKey: @"sha256"]))
-    || [[ai objectForKey: @"fileName"] rangeOfString: @"/"].location != NSNotFound)
+  if (!isPlainFileName(str([ai objectForKey: @"fileName"])) || !isHex64(str([ai objectForKey: @"sha256"])))
     {
       /* Without a binding the file can't be tied to any AppImage: reject. */
       if (error) *error = sidecarError(GTSErrorInvalidSchema,
@@ -109,6 +133,8 @@ isHex64(NSString *s)
       return nil;
     }
 
+  if ([json objectForKey: @"themes"] != nil && arr([json objectForKey: @"themes"]) == nil)
+    [warnings addObject: @"themes is not a list; no themes read"];
   e = [arr([json objectForKey: @"themes"]) objectEnumerator];
   while ((t = [e nextObject]) != nil)
     {
@@ -117,7 +143,8 @@ isHex64(NSString *s)
       NSString *status;
       if (str([td objectForKey: @"name"]) == nil)
         {
-          [warnings addObject: @"a theme entry without a name was skipped"];
+          [warnings addObject: td ? @"a theme entry without a name was skipped"
+                                  : @"a theme entry that is not an object was skipped"];
           continue;
         }
       x = [[[GTSSidecarTheme alloc] init] autorelease];

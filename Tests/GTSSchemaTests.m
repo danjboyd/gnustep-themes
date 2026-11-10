@@ -165,6 +165,25 @@ minimal(void)
   XCTAssertEqual([err code], (NSInteger)GTSErrorUnsupportedVersion);
 }
 
+- (void) testSchemaVersionMustBeAnInteger
+{
+  NSArray *bad = [NSArray arrayWithObjects: [NSNumber numberWithBool: YES],
+    [NSNumber numberWithDouble: 1.5], @"1x", @"", nil];
+  NSEnumerator *e = [bad objectEnumerator];
+  id v;
+  while ((v = [e nextObject]) != nil)
+    {
+      NSMutableDictionary *p = minimal();
+      [p setObject: v forKey: @"SchemaVersion"];
+      XCTAssertNil([GTSThemeSettingsSchema schemaWithPropertyList: p path: @"mem" error: NULL], @"%@", v);
+    }
+  {
+    NSMutableDictionary *p = minimal();
+    [p setObject: [NSNumber numberWithInt: 1] forKey: @"SchemaVersion"];
+    XCTAssertNotNil([GTSThemeSettingsSchema schemaWithPropertyList: p path: @"mem" error: NULL]);
+  }
+}
+
 - (void) testDuplicateIdentifierSkipped
 {
   NSMutableDictionary *p = minimal();
