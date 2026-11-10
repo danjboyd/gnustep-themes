@@ -124,7 +124,7 @@
 {
   NSString *domain;
   NSError *err = nil;
-  DESTROY(_session); DESTROY(_roApp); DESTROY(_appInfo);
+  DESTROY(_session); DESTROY(_roApp); DESTROY(_appInfo); DESTROY(_globalBaseline);
   ASSIGN(_sidecar, sidecar);
   ASSIGN(_appImagePath, appImagePath);
   _binding = [sidecar bindingForAppImageAtPath: appImagePath];
@@ -145,8 +145,6 @@
   return _binding == GTSSidecarBound;
 }
 
-/* Name of the theme the AppImage app will use, as far as the app domain
-   and the recognised seed policy tell; nil when not known. */
 /* Theme whose settings are listed: the package's default (recognised
    policy), else the theme in this editor's store. A listing choice, not a
    claim about what the running AppImage uses. */
