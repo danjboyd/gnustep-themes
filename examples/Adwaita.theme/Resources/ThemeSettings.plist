@@ -40,7 +40,7 @@
       Values = (
         { Value = gnome; Title = "GNOME sizes"; },
         { Value = compact; Title = "Compact (GNUstep sizes)"; },
-        { Value = auto; Title = "Automatic"; Help = "Compact for apps laid out in Gorm/nib; ignores the app's own preference."; }
+        { Value = auto; Title = "Automatic"; Help = "Compact for apps laid out in Gorm or nib files; ignores the app's own preference."; }
       );
       Scopes = ( global, application ); Group = layout;
       Title = "Control sizes"; Help = "GNOME's sizes, GNUstep's compact sizes, or automatic for apps laid out in Gorm.";
