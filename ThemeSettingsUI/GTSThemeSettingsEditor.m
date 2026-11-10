@@ -33,8 +33,11 @@ wrappedHeight(NSString *text, float width, float size)
 {
   NSDictionary *a = [NSDictionary dictionaryWithObject: [NSFont systemFontOfSize: size]
                                                 forKey: NSFontAttributeName];
-  float lineW = [text sizeWithAttributes: a].width;
-  int lines = (int)(lineW / (width - 8)) + 1;
+  NSEnumerator *e = [[text componentsSeparatedByString: @"\n"] objectEnumerator];
+  NSString *para;
+  int lines = 0;
+  while ((para = [e nextObject]) != nil)   /* each paragraph wraps on its own */
+    lines += (int)([para sizeWithAttributes: a].width / (width - 8)) + 1;
   return lines * (size + 5) + 2;
 }
 
@@ -151,10 +154,15 @@ wrappedHeight(NSString *text, float width, float size)
   [p setAction: @selector(themeChanged:)];
   [p setEnabled: editable];
   [_content addSubview: p];
-  t = label([_model themeStateText], 10, NO, [NSColor grayColor]);
-  [t setFrame: NSMakeRect(x2, y + 27, kControlW + kResetW, 16)];
-  [_content addSubview: t];
-  y += 46;
+  {
+    /* Seeded-theme states can be a sentence or two: wrap, don't clip. */
+    float h = wrappedHeight([_model themeStateText], kControlW + kResetW, 10);
+    t = label([_model themeStateText], 10, NO, [NSColor grayColor]);
+    [[t cell] setWraps: YES];
+    [t setFrame: NSMakeRect(x2, y + 27, kControlW + kResetW, h)];
+    [_content addSubview: t];
+    y += 30 + (h > 16 ? h : 16);
+  }
   note = [_model themeNote];
   if ([note length] > 0)
     {

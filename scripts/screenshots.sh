@@ -8,7 +8,8 @@
 # GTS_TEST_ROOT=<scratch>. Cleanup records pid:starttime for marked
 # processes and rechecks start time + exact marker right before each
 # signal; anything left keeps the scratch config and fails the run.
-#   GTS_SHOTS_ONLY=A runs only scenario A (startup/cleanup validation).
+#   GTS_SHOTS_ONLY=A runs only scenario A (startup/cleanup validation);
+#   =F only the free-form scenario; =G only the AppImage-target scenario.
 set -eu
 here=$(cd "$(dirname "$0")/.." && pwd)
 out=${1:?usage: screenshots.sh <output-dir>}
@@ -124,6 +125,33 @@ check() {   # domain key expected label
   else echo "CHECK FAILED: $4 ($1 $2 = ${got:-<absent>}, want ${3:-<absent>})"; checkfail=1; fi
 }
 checkfail=0
+
+# G. AppImage targets (read-only): a bound sidecar and one whose AppImage is
+#    missing. The "AppImage" is a plain file: it is only hashed, never run.
+if [ "${GTS_SHOTS_ONLY:-}" = G ]; then
+  mkdir -p "$root/appimages"
+  printf 'stand-in bytes, not an AppImage\n' > "$root/appimages/Notes-1.0-x86_64.AppImage"
+  sha=$(sha256sum "$root/appimages/Notes-1.0-x86_64.AppImage" | cut -d' ' -f1)
+  gum='{"SchemaVersion":1,"Theme":"Gumdrop","ThemeIdentifier":"org.gnustep.themes.gumdrop","Settings":[{"Identifier":"gumdrop.menu-style","Key":"GumdropMenuStyle","Type":"enum","CaseInsensitive":"YES","Values":[{"Value":"primary","Title":"Title-bar menu button"},{"Value":"menubar","Title":"In-window menu bar"}],"Scopes":["global","application"],"Title":"Menu style","Unset":{"Behavior":"static","Value":"primary"},"Precedence":["argument","application","global",{"Source":"applicationInfo","Values":["menubar"]}],"Apply":"restart"}]}'
+  side() {   # file appimage-name sha
+    printf '{"schema":1,"appimage":{"fileName":"%s","sha256":"%s"},"package":{"id":"org.example.NotesImg"},"app":{"executable":"Notes","bundleIdentifier":"org.example.NotesImg","runtimeDomainHint":"org.example.NotesImg","runtimeDomainHintSource":"bundleIdentifier"},"defaults":{"seedDomain":"org.example.NotesImg","seedDomainMatchesRuntimeHint":true,"seeds":[{"key":"GSTheme","value":"Gumdrop","policy":"each-launch-if-absent","rank":1}],"env":[]},"themes":[{"name":"Gumdrop","themeId":"org.gnustep.themes.gumdrop","infoStatus":"ok","origin":"themeInputs","installation":{"bundledPath":"usr/GNUstep/System/Library/Themes/Gumdrop.theme","executableStatus":"ok"},"settings":{"status":"inline","schemaVersion":1,"inline":%s}},{"name":"Big","infoStatus":"ok","settings":{"status":"notInlined","inline":null,"note":"over 256 KiB"}}]}\n' "$2" "$3" "$gum" > "$1"
+  }
+  side "$root/appimages/Notes-1.0-x86_64.themes.json" Notes-1.0-x86_64.AppImage "$sha"
+  side "$root/appimages/Gone-2.0-x86_64.themes.json" Gone-2.0-x86_64.AppImage "$sha"
+  D write org.example.NotesImg GumdropMenuStyle menubar
+  before=$(ls "$root/user/Defaults" | tr '\n' ' ')
+  run "$APP" $X -GTSSidecar "$root/appimages/Notes-1.0-x86_64.themes.json" -GTSScript \
+    "log; shot $out/G1-appimage-bound-readonly.png; choose gumdrop.menu-style primary"
+  run "$APP" $X -GTSSidecar "$root/appimages/Gone-2.0-x86_64.themes.json" -GTSScript \
+    "log; shot $out/G2-appimage-missing.png"
+  check org.example.NotesImg GumdropMenuStyle menubar "G read-only: nothing written"
+  check org.example.NotesImg GSTheme "" "G no GSTheme written (seed is AppRun's job)"
+  after=$(ls "$root/user/Defaults" | tr '\n' ' ')
+  [ "$before" = "$after" ] && echo "CHECK ok: G defaults directory unchanged ($after)" || { echo "CHECK FAILED: G defaults changed"; checkfail=1; }
+  grep -h "^script:" "$root/apps.log"
+  [ "$checkfail" -eq 0 ] || fail "read-back checks failed"
+  exit 0
+fi
 
 if [ "${GTS_SHOTS_ONLY:-}" != F ]; then
 # A. standalone, global target

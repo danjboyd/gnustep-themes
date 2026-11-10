@@ -3,6 +3,7 @@
    tested headless; the AppKit view just renders it. */
 #import <Foundation/Foundation.h>
 
+@class GTSAppImageSidecar;
 @class GTSDefaultsDomainStore, GTSDomainSnapshot, GTSThemeCatalog, GTSThemeRecord, GTSEditSession,
   GTSSettingDescriptor, GTSResolvedValue;
 
@@ -56,6 +57,10 @@
   BOOL _showUnstable;
   NSString *_message;
   NSString *_hostDomain;       /* domain of the process showing the editor */
+  GTSAppImageSidecar *_sidecar; /* AppImage target (read-only) */
+  NSString *_appImagePath;
+  int _binding;                 /* GTSSidecarBinding */
+  GTSDomainSnapshot *_roApp;    /* AppImage app domain, read only; nil = unknown */
 }
 - (id) initWithStore: (GTSDefaultsDomainStore*)store catalog: (GTSThemeCatalog*)catalog;
 
@@ -70,6 +75,13 @@
    the standalone configurator. Only edits to the host's own domain can be
    confirmed as applied live; other processes may need a restart. */
 - (void) setHostDomain: (NSString*)domain;
+/* AppImage target described by its sidecar. ALWAYS read-only: nothing is
+   staged or applied, the AppImage is only hashed (never mounted or run).
+   Values are read from the app's defaults domain only when the sidecar is
+   bound to the AppImage and names the domain. appImagePath nil = the file
+   named by the sidecar, beside it. Returns NO if nothing usable is known. */
+- (BOOL) setTargetAppImageSidecar: (GTSAppImageSidecar*)sidecar appImage: (NSString*)appImagePath;
+- (BOOL) targetIsAppImage;
 - (BOOL) isEditable;
 - (BOOL) targetIsGlobal;
 - (NSString*) targetTitle;

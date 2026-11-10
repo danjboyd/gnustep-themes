@@ -25,3 +25,10 @@ is checked afterwards by reading the value back with `/usr/bin/defaults`.
 Not shown or proven: a running theme actually re-rendering (the example
 themes are metadata only, not loadable themes), cross-process live
 propagation, AppImage/sidecar targets, Windows/macOS.
+
+## AppImage targets (read-only), scenario G (`GTS_SHOTS_ONLY=G`)
+
+| File | What it shows |
+|---|---|
+| G1-appimage-bound-readonly.png | Sidecar bound to its (stand-in) AppImage by name + sha256. Settings domain from the app's bundle identifier; GSTheme absent, so "Gumdrop (packaged default)" and when AppRun sets it again; bundled theme's settings are described; compatibility not known. Menu style shows the stored value, read-only (the scripted change attempt fails: control disabled). Read-back: nothing written, no GSTheme written, defaults directory listing unchanged. |
+| G2-appimage-missing.png | Sidecar whose AppImage is not there: "Not known", no values, nothing editable. |

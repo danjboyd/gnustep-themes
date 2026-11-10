@@ -6,6 +6,7 @@
 #import "GTSThemeCatalog.h"
 #import "GTSScreenshot.h"
 #import "GTSScriptRunner.h"
+#import "GTSAppImageSidecar.h"
 
 @interface GTSConfigurator : NSObject
 {
@@ -17,6 +18,7 @@
   NSInteger _lastTarget;
 }
 - (BOOL) selectApplicationAtPath: (NSString*)path;
+- (BOOL) selectSidecarAtPath: (NSString*)path;
 @end
 
 @implementation GTSConfigurator
@@ -81,6 +83,7 @@
       [_appPaths addObject: path];
     }
   [_target addItemWithTitle: @"Other application…"];
+  [_target addItemWithTitle: @"AppImage theme information…"];
   [_target setTarget: self];
   [_target setAction: @selector(targetChanged:)];
   [content addSubview: _target];
@@ -90,7 +93,13 @@
   [content addSubview: ev];
 
   preset = [ud stringForKey: @"GTSTargetApp"];     /* optional: start on an app */
-  if ([preset length] > 0 && [self selectApplicationAtPath: preset])
+  if ([[ud stringForKey: @"GTSSidecar"] length] > 0)
+    {
+      [self selectSidecarAtPath: [ud stringForKey: @"GTSSidecar"]];
+      _lastTarget = [_target numberOfItems] - 1;
+      [_target selectItemAtIndex: _lastTarget];
+    }
+  else if ([preset length] > 0 && [self selectApplicationAtPath: preset])
     {
       NSUInteger i = [_appPaths indexOfObject: preset];
       if (i == NSNotFound)
@@ -129,6 +138,20 @@
   return YES;
 }
 
+- (BOOL) selectSidecarAtPath: (NSString*)path
+{
+  NSError *err = nil;
+  GTSAppImageSidecar *s = [GTSAppImageSidecar sidecarWithContentsOfFile: path error: &err];
+  if (s == nil)
+    {
+      NSRunAlertPanel(@"Can't use this file", @"%@", @"OK", nil, nil, [err localizedDescription]);
+      return NO;
+    }
+  /* Shown even when not bound: the editor then says why nothing is current. */
+  [_model setTargetAppImageSidecar: s appImage: nil];
+  return YES;
+}
+
 - (void) targetChanged: (id)sender
 {
   NSInteger i = [sender indexOfSelectedItem];
@@ -144,6 +167,16 @@
     [_model setTargetGlobal];
   else if (i <= (NSInteger)[_appPaths count])
     ok = [self selectApplicationAtPath: [_appPaths objectAtIndex: i - 1]];
+  else if (i == [sender numberOfItems] - 1)
+    {
+      /* Explicit file choice: the sidecar written beside an AppImage. The
+         AppImage itself is only hashed, never mounted or run. */
+      NSOpenPanel *op = [NSOpenPanel openPanel];
+      [op setCanChooseDirectories: NO];
+      [op setCanChooseFiles: YES];
+      ok = [op runModalForTypes: [NSArray arrayWithObject: @"json"]] == NSOKButton
+        && [self selectSidecarAtPath: [op filename]];
+    }
   else
     {
       NSOpenPanel *op = [NSOpenPanel openPanel];

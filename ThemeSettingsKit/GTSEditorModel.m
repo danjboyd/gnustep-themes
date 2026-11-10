@@ -5,9 +5,13 @@
 #import "GTSThemeSettingsSchema.h"
 #import "GTSSettingsResolver.h"
 #import "GTSEditSession.h"
+#import "GTSAppImageSidecar.h"
 
 @interface GTSEditorModel (Private)
 - (NSString*) titleForValue: (id)value setting: (GTSSettingDescriptor*)s;
+- (NSString*) appImageNote;
+- (NSString*) appImageThemeName;
+- (GTSThemeSettingsSchema*) currentSchema;
 @end
 
 @implementation GTSChoice
@@ -65,7 +69,7 @@
 {
   [_store release]; [_catalog release]; [_appDomain release]; [_appName release];
   [_appInfo release]; [_session release]; [_globalBaseline release]; [_message release];
-  [_hostDomain release];
+  [_hostDomain release]; [_sidecar release]; [_appImagePath release]; [_roApp release];
   [super dealloc];
 }
 
@@ -81,8 +85,14 @@
   return s != nil;
 }
 
+- (void) leaveAppImageMode
+{
+  DESTROY(_sidecar); DESTROY(_appImagePath); DESTROY(_roApp);
+}
+
 - (BOOL) setTargetGlobal
 {
+  [self leaveAppImageMode];
   DESTROY(_appDomain); DESTROY(_appName); DESTROY(_appInfo); DESTROY(_globalBaseline);
   return [self openSessionForDomain: NSGlobalDomain];
 }
@@ -92,6 +102,7 @@
                                info: (NSDictionary*)info
 {
   NSError *err = nil;
+  [self leaveAppImageMode];
   ASSIGN(_appDomain, domain);
   ASSIGN(_appName, (name ? name : domain));
   ASSIGN(_appInfo, info);
@@ -106,6 +117,55 @@
 }
 
 - (void) setHostDomain: (NSString*)domain { ASSIGN(_hostDomain, domain); }
+
+- (BOOL) targetIsAppImage { return _sidecar != nil; }
+
+- (BOOL) setTargetAppImageSidecar: (GTSAppImageSidecar*)sidecar appImage: (NSString*)appImagePath
+{
+  NSString *domain;
+  NSError *err = nil;
+  DESTROY(_session); DESTROY(_roApp); DESTROY(_appInfo);
+  ASSIGN(_sidecar, sidecar);
+  ASSIGN(_appImagePath, appImagePath);
+  _binding = [sidecar bindingForAppImageAtPath: appImagePath];
+  domain = [sidecar runtimeDomainHint];
+  ASSIGN(_appDomain, (domain ? domain : (NSString*)@"(unknown domain)"));
+  ASSIGN(_appName, [sidecar appImageFileName]);
+  [self setMessage: nil];
+  /* Values only when the metadata is known to describe this AppImage and
+     names the domain the app reads. Reading only; no session. */
+  if (_binding == GTSSidecarBound && domain != nil)
+    {
+      ASSIGN(_globalBaseline, [_store snapshotForDomain: NSGlobalDomain error: &err]);
+      if (_globalBaseline != nil)
+        ASSIGN(_roApp, [_store snapshotForDomain: domain error: &err]);
+      if (_roApp == nil)
+        [self setMessage: [err localizedDescription]];
+    }
+  return _binding == GTSSidecarBound;
+}
+
+/* Name of the theme the AppImage app will use, as far as the app domain
+   and the recognised seed policy tell; nil when not known. */
+- (NSString*) appImageThemeName
+{
+  id stored = [_roApp objectForKey: @"GSTheme"];
+  if (_roApp == nil) return nil;
+  if (stored != nil) return stored;
+  if ([_sidecar seededThemeStateForStoredValue: nil inDomain: [_roApp domainName]] == GTSSeedAbsentWillApply)
+    return [_sidecar seededTheme];
+  return nil;
+}
+
+- (GTSThemeSettingsSchema*) currentSchema
+{
+  if (_sidecar != nil)
+    {
+      GTSSidecarTheme *t = [_sidecar themeNamed: [self appImageThemeName]];
+      return [t isFullyDescribed] ? [t schema] : nil;
+    }
+  return [[self effectiveTheme] schema];
+}
 - (BOOL) isEditable { return _session != nil && ![_session needsRebase]; }
 
 - (BOOL) targetIsGlobal { return _appDomain == nil; }
@@ -113,12 +173,19 @@
 
 - (NSString*) targetTitle
 {
+  if (_sidecar != nil)
+    return [NSString stringWithFormat: @"%@ (AppImage, read-only)", [_sidecar appImageFileName]];
   if ([self targetIsGlobal]) return @"All applications";
   return [NSString stringWithFormat: @"%@ (%@)", _appName, _appDomain];
 }
 
 - (GTSSettingsResolver*) resolver
 {
+  if (_sidecar != nil)
+    return [[[GTSSettingsResolver alloc] initWithGlobal: (_globalBaseline ? _globalBaseline
+        : [[[GTSDomainSnapshot alloc] initWithDomainName: NSGlobalDomain values: nil] autorelease])
+      application: (_roApp ? _roApp : [[[GTSDomainSnapshot alloc] initWithDomainName: @"" values: nil] autorelease])
+      applicationInfo: nil] autorelease];
   GTSDomainSnapshot *pending = [_session pendingSnapshot];
   if (_session == nil)
     pending = [[[GTSDomainSnapshot alloc] initWithDomainName: @"" values: nil] autorelease];
@@ -158,6 +225,16 @@ stateText(GTSResolvedValue *v, BOOL global)
 - (NSArray*) themeChoices
 {
   NSMutableArray *a = [NSMutableArray array];
+  if (_sidecar != nil)
+    {
+      /* One read-only entry describing what is stored. No "same as all
+         applications" choice: for a seeded theme removal is not lasting. */
+      NSString *name = [self appImageThemeName];
+      NSString *title = name ? name : @"Not known";
+      if (name != nil && [_roApp objectForKey: @"GSTheme"] == nil)
+        title = [NSString stringWithFormat: @"%@ (packaged default)", name];
+      return [NSArray arrayWithObject: [GTSChoice choiceWithTitle: title value: name]];
+    }
   if (_session == nil)   /* nothing known: never present a guess as current */
     return [NSArray arrayWithObject: [GTSChoice choiceWithTitle: @"Unknown (settings could not be read)" value: nil]];
   GTSResolvedValue *v = [[self resolver] resolveThemeSelection];
@@ -184,6 +261,7 @@ stateText(GTSResolvedValue *v, BOOL global)
 
 - (NSInteger) selectedThemeIndex
 {
+  if (_sidecar != nil) return 0;
   id ex = [[[self resolver] resolveThemeSelection] explicitValue];
   NSArray *c = [self themeChoices];
   NSUInteger i;
@@ -197,6 +275,13 @@ stateText(GTSResolvedValue *v, BOOL global)
 
 - (NSString*) themeStateText
 {
+  if (_sidecar != nil)
+    {
+      if (_roApp == nil) return @"Not available";
+      return [_sidecar descriptionOfSeededThemeState:
+        [_sidecar seededThemeStateForStoredValue: [_roApp objectForKey: @"GSTheme"]
+                                        inDomain: [_roApp domainName]]];
+    }
   if (_session == nil) return @"Not available";
   return stateText([[self resolver] resolveThemeSelection], [self targetIsGlobal]);
 }
@@ -210,6 +295,8 @@ stateText(GTSResolvedValue *v, BOOL global)
 {
   GTSThemeRecord *r = [self effectiveTheme];
   NSMutableArray *parts = [NSMutableArray array];
+  if (_sidecar != nil)
+    return [self appImageNote];
   if (_session == nil)
     return @"This target's settings could not be read, so nothing here can be shown or changed. "
       @"Nothing has been written. See the message below.";
@@ -239,8 +326,45 @@ stateText(GTSResolvedValue *v, BOOL global)
   return [parts componentsJoinedByString: @"\n"];
 }
 
+- (NSString*) appImageNote
+{
+  NSMutableArray *p = [NSMutableArray array];
+  NSString *src = [_sidecar runtimeDomainHintSource];
+  NSNumber *match = [_sidecar seedDomainMatchesRuntimeHint];
+  NSString *name = [self appImageThemeName];
+  GTSSidecarTheme *t = name ? [_sidecar themeNamed: name] : nil;
+  static NSString *statusText[] = { @"has no settings description", @"settings described",
+    @"settings not available without opening the AppImage (too large)", @"settings description is damaged",
+    @"settings not available (outside the AppImage or a link loop)", @"settings status not understood" };
+
+  [p addObject: [GTSAppImageSidecar descriptionOfBinding: _binding]];
+  if (_binding != GTSSidecarBound)
+    {
+      [p addObject: @"Nothing below is shown as current until the theme information matches the AppImage."];
+      return [p componentsJoinedByString: @"\n"];
+    }
+  if ([_sidecar runtimeDomainHint] == nil)
+    [p addObject: @"The app's settings domain is not known, so its current settings can't be shown."];
+  else
+    [p addObject: [NSString stringWithFormat: @"Settings domain %@ (from the app's %@).",
+      [_sidecar runtimeDomainHint], [src isEqual: @"bundleIdentifier"] ? @"bundle identifier" : @"process name"]];
+  if (match != nil && ![match boolValue])
+    [p addObject: [NSString stringWithFormat: @"Warning: the package sets its default theme in %@, "
+      @"not in the domain the app reads.", [_sidecar seedDomain]]];
+  if (name != nil && t == nil)
+    [p addObject: [NSString stringWithFormat: @"%@ is not bundled in this AppImage; it may come from your own Library.", name]];
+  else if (t != nil)
+    [p addObject: [NSString stringWithFormat: @"Bundled theme %@: %@.", name, statusText[[t settingsStatus]]]];
+  [p addObject: @"Whether bundled theme code matches this system's GNUstep is not known."];
+  if ([[_sidecar warnings] count] > 0)
+    [p addObject: [NSString stringWithFormat: @"Theme information warnings: %@",
+      [[_sidecar warnings] componentsJoinedByString: @"; "]]];
+  return [p componentsJoinedByString: @"\n"];
+}
+
 - (void) selectThemeChoiceAtIndex: (NSInteger)index
 {
+  if (_sidecar != nil) return;   /* read-only */
   NSArray *c = [self themeChoices];
   if (index < 0 || (NSUInteger)index >= [c count]) return;
   [_session stageThemeSelection: [[c objectAtIndex: index] value]];
@@ -252,7 +376,7 @@ stateText(GTSResolvedValue *v, BOOL global)
 
 - (NSString*) unsetTitleFor: (GTSSettingDescriptor*)s resolved: (GTSResolvedValue*)v
 {
-  GTSThemeSettingsSchema *sc = [[self effectiveTheme] schema];
+  GTSThemeSettingsSchema *sc = [self currentSchema];
   if (![self targetIsGlobal] && [v globalValue] != nil)
     return [NSString stringWithFormat: @"Same as all applications (%@)",
       [self titleForValue: [v globalValue] setting: s]];
@@ -266,7 +390,7 @@ stateText(GTSResolvedValue *v, BOOL global)
 
 - (NSString*) titleForValue: (id)value setting: (GTSSettingDescriptor*)s
 {
-  GTSThemeSettingsSchema *sc = [[self effectiveTheme] schema];
+  GTSThemeSettingsSchema *sc = [self currentSchema];
   NSEnumerator *e = [[s values] objectEnumerator];
   NSDictionary *d;
   if ([s type] == GTSSettingTypeBool)
@@ -279,15 +403,14 @@ stateText(GTSResolvedValue *v, BOOL global)
 
 - (NSArray*) rows
 {
-  GTSThemeRecord *theme = [self effectiveTheme];
-  GTSThemeSettingsSchema *sc = [theme schema];
+  GTSThemeSettingsSchema *sc = [self currentSchema];
   NSString *scope = [self targetIsGlobal] ? GTSScopeGlobal : GTSScopeApplication;
   GTSSettingsResolver *res = [self resolver];
   NSMutableArray *rows = [NSMutableArray array];
   NSEnumerator *e = [(_showUnstable ? [sc settings] : [sc publicSettings]) objectEnumerator];
   GTSSettingDescriptor *s;
 
-  if (_session == nil) return rows;
+  if (_session == nil && (_sidecar == nil || _roApp == nil)) return rows;
 
   while ((s = [e nextObject]) != nil)
     {
@@ -303,7 +426,9 @@ stateText(GTSResolvedValue *v, BOOL global)
       row->_setting = [s retain];
       row->_title = [[sc localizedString: [s title]] copy];
       row->_stateText = [stateText(v, [self targetIsGlobal]) copy];
-      row->_readOnly = [s isReadOnly] || [sc isReadOnly];
+      row->_readOnly = [s isReadOnly] || [sc isReadOnly] || _sidecar != nil;
+      if (_sidecar != nil)
+        [notes addObject: @"Shown read-only: AppImage settings are not edited here."];
       row->_canReset = [v hasOverride] && !row->_readOnly;
       if ([s isReadOnly])
         [notes addObject: [NSString stringWithFormat: @"Read-only: needs %@.",
