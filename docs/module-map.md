@@ -7,7 +7,7 @@ Status: draft, 2026-11-10. Owner of this repo: agent `gnustep-themes`. Liaison: 
 | Module | Depends on | Owns |
 |---|---|---|
 | `ThemeSettingsKit` (library) | Foundation only | Metadata schema v1 + loader/validator, theme discovery (`GTSThemeCatalog`), exact-domain defaults store (`GTSDefaultsDomainStore`), resolver (explicit / inherited / Info.plist / default / unknown), edit session (Apply/Cancel, optimistic conflict detection). Never loads theme code. |
-| `ThemeSettingsUI` (library) | AppKit + ThemeSettingsKit | Reusable editor view/controller. Same object is embedded by both front ends. |
+| `ThemeSettingsUI` (library `libThemeSettingsUI`) | AppKit + ThemeSettingsKit | Reusable editor view/controller (`GTSThemeSettingsEditor` only; screenshot/script helpers stay out). Same class is embedded by both front ends, which still compile it from source. Top-level `GNUmakefile` builds Kit then UI. |
 | `ThemeSettingsApp` (app) | ThemeSettingsUI | Standalone configurator: global + per-app targets; picks a target app, resolves its real defaults domain and the themes visible to it. |
 | In-app pane | ThemeSettingsUI | Host app embeds the editor; target defaults to the host's own domain; global editing is an explicit switch. |
 | `Tests` (xctest bundle) | ThemeSettingsKit | Defaults proof + schema/discovery/resolver/session/model/sidecar tests under an isolated `GNUSTEP_CONFIG_FILE` (`scripts/run-tests.sh`); harness self-test `scripts/test-runner.sh`; GUI scenarios `scripts/screenshots.sh` (private Xvfb). |
@@ -51,6 +51,7 @@ only; visual review of the screenshots has not been done independently.
 | AppImage sidecar reader | 8adc88e (aligned 5c50e75, pinned a410c52) | 19 sidecar tests | yes (#21531) |
 | Read-only AppImage targets in the editor | 62570a2 | 101/101 model tests; scenario G used a stand-in artifact and predates the final text | yes (#21659) |
 | Editor Apply callback contract in a real AppKit host (+ fix: typed text was read from live field-editor storage, so invalid text became a Reset that deleted the stored value) | 06a84a6 | scenario H, `Tests/HostCheck`: 14/14 host assertions on private Xvfb without a window manager; the reverted-fix control fails twice; fresh read-back; unit 110/110; harness 14/14 | yes (#22060) |
+| Installed Kit/UI libraries: scratch-prefix staging, out-of-tree host | see git log | scenario I: staged-file hashes, no files in real LOCAL/USER paths, host build with no source-tree path, ldd/dladdr show both libraries from the stage, one Apply saved + read back | pending |
 
 ## Unresolved proof gaps
 

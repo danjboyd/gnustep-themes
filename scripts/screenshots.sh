@@ -10,7 +10,10 @@
 # signal; anything left keeps the scratch config and fails the run.
 #   GTS_SHOTS_ONLY=A runs only scenario A (startup/cleanup validation);
 #   =F only the free-form scenario; =G only the AppImage-target scenario;
-#   =H only the editor callback host check (Tests/HostCheck).
+#   =H only the editor callback host check (Tests/HostCheck);
+#   =I only the installed-library smoke: Kit/UI staged into a prefix inside
+#      the scratch root (make install DESTDIR=...), Tests/ExternalHost built
+#      out of tree against it, link/runtime receipts, one Apply on Xvfb.
 set -eu
 here=$(cd "$(dirname "$0")/.." && pwd)
 out=${1:?usage: screenshots.sh <output-dir>}
@@ -126,6 +129,60 @@ check() {   # domain key expected label
   else echo "CHECK FAILED: $4 ($1 $2 = ${got:-<absent>}, want ${3:-<absent>})"; checkfail=1; fi
 }
 checkfail=0
+
+# I. Installed-library smoke. Stage Kit/UI into $root/stage only, build the
+#    external host from a copy in $root/host against the staged interface,
+#    check its link/runtime dependencies, run one Apply. Removed with $root.
+if [ "${GTS_SHOTS_ONLY:-}" = I ]; then
+  stage="$root/stage"; mkdir -p "$stage" "$root/host"
+  inc="$stage$(gnustep-config --variable=GNUSTEP_LOCAL_HEADERS)"
+  lib="$stage$(gnustep-config --variable=GNUSTEP_LOCAL_LIBRARIES)"
+  make -s -C "$here" messages=no >/dev/null || fail "library build failed"
+  make -s -C "$here" install messages=no DESTDIR="$stage" GNUSTEP_INSTALLATION_DOMAIN=LOCAL >/dev/null \
+    || fail "staged install failed"
+  echo "screenshots: staged files (sha256, relative to $stage):"
+  (cd "$stage" && find . -type f | sort | xargs sha256sum | sed 's/^\(.\{16\}\)[0-9a-f]*/\1/')
+  (cd "$stage" && find . -type l | sort | while read -r l; do echo "  link $l -> $(readlink "$l")"; done)
+  # Nothing may land in the real install locations.
+  leaked=$(ls -d "$(gnustep-config --variable=GNUSTEP_LOCAL_LIBRARIES)"/libThemeSettings* \
+    "$(gnustep-config --variable=GNUSTEP_LOCAL_HEADERS)"/ThemeSettings* \
+    "$HOME"/GNUstep/Library/Libraries/libThemeSettings* "$HOME"/GNUstep/Library/Headers/ThemeSettings* 2>/dev/null || true)
+  [ -z "$leaked" ] && echo "CHECK ok: I nothing installed in the real LOCAL/USER locations" \
+    || { echo "CHECK FAILED: I found installed files: $leaked"; checkfail=1; }
+  cp "$here/Tests/ExternalHost/GNUmakefile" "$here/Tests/ExternalHost/main.m" "$root/host/"
+  make -C "$root/host" messages=yes GTS_INCLUDE="$inc" GTS_LIB="$lib" >"$root/host-build.log" 2>&1 \
+    || { cat "$root/host-build.log"; fail "external host build failed"; }
+  hb="$root/host/obj/gts-external-host"
+  grep -q -- "$here" "$root/host-build.log" && { echo "CHECK FAILED: I host build referenced the source tree"; checkfail=1; } \
+    || echo "CHECK ok: I host build used no source-tree path (only $inc, $lib)"
+  nm "$hb" | grep -q " [TDB] __objc_class_name_GTS" && { echo "CHECK FAILED: I host binary defines GTS classes"; checkfail=1; } \
+    || echo "CHECK ok: I host binary defines no GTS classes (all from the libraries)"
+  echo "screenshots: host NEEDED: $(objdump -p "$hb" | awk '/NEEDED/{printf "%s ", $2}')"
+  deps=$(LD_LIBRARY_PATH="$lib" ldd "$hb")
+  echo "$deps" | grep -i "themesettings\|gnustep\|gnutls\|not found" | sed 's/^/  ldd: /'
+  for so in libThemeSettingsUI.so.0 libThemeSettingsKit.so.0; do
+    p=$(echo "$deps" | awk -v s="$so" '$1==s{print $3}')
+    [ "$p" = "$lib/$so" ] && echo "CHECK ok: I $so resolves to the staged prefix" \
+      || { echo "CHECK FAILED: I $so resolves to ${p:-nothing}"; checkfail=1; }
+  done
+  echo "$deps" | grep -q "not found" && { echo "CHECK FAILED: I unresolved dependency"; checkfail=1; } \
+    || echo "CHECK ok: I no unresolved dependencies"
+  [ "$(echo "$deps" | awk '/libgnustep-base/{print $3}')" = "$(ldd /usr/bin/defaults | awk '/libgnustep-base/{print $3}')" ] \
+    && echo "CHECK ok: I same libgnustep-base as the defaults tool" || { echo "CHECK FAILED: I other libgnustep-base"; checkfail=1; }
+  ldd "$hb" | grep -q "libThemeSettingsUI.so.0 => not found" \
+    && echo "CHECK ok: I without the staged path the libraries are not found (no fallback copy)" \
+    || { echo "CHECK FAILED: I libraries found outside the stage"; checkfail=1; }
+  D write org.example.ExternalHost GSTheme Adwaita
+  ehs=0
+  LD_LIBRARY_PATH="$lib" timeout 90 "$hb" $X -GTSHostDomain org.example.ExternalHost -GTSStageLib "$lib" \
+    >>"$root/apps.log" 2>&1 || ehs=$?
+  grep -h "^CHECK\|^external-host:" "$root/apps.log"
+  echo "screenshots: external host exit status $ehs"
+  [ "$ehs" -eq 0 ] || checkfail=1
+  check org.example.ExternalHost GnomeThemeAccentColor purple "I defaults tool read-back"
+  [ "$checkfail" -eq 0 ] || fail "installed-library smoke failed"
+  exit 0
+fi
 
 # H. Callback contract of the real editor in a disposable AppKit host
 #    (Tests/HostCheck): capture, order, nested Apply, exception reset,

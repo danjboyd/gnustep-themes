@@ -17,11 +17,37 @@ pane is replaced or migrated.
 | The window or panel, menu item and the "all applications" switch | host app | the editor provides a view only |
 | ThemeSettings.plist for each theme | theme owners | adwaita, winuitheme, fun-themes |
 
-**Build dependencies:** gnustep-base, gnustep-gui and GnuTLS. Include
-`gts-config.make` so GnuTLS is detected and linked explicitly. Compile
-`ThemeSettingsKit/GTS*.m` and `ThemeSettingsUI/GTS*.m`, as the demo does, or
-link `libThemeSettingsKit` (UI library packaging is not done yet). No
-libobjc2-only features are used, and the GCC runtime works.
+**Build dependencies:** gnustep-base, gnustep-gui and GnuTLS. Two ways to
+build a host:
+
+1. **Against the installed libraries (preferred for a separate project).**
+   The top-level `GNUmakefile` builds `libThemeSettingsKit` (Foundation +
+   GnuTLS) and `libThemeSettingsUI` (the editor; NEEDED: Kit, gnustep-gui,
+   gnustep-base). Both are soname `.so.0` (version 0.1.0). Public headers:
+   `<ThemeSettingsKit/ThemeSettingsKit.h>` and
+   `<ThemeSettingsUI/ThemeSettingsUI.h>` (umbrella headers). The host links
+   `-lThemeSettingsUI -lThemeSettingsKit -lgnustep-gui`; it needs no
+   GnuTLS flags of its own. `Tests/ExternalHost` is the minimal example.
+   Stage into a scratch prefix only, never a user or system location:
+   ```sh
+   make install DESTDIR=/path/to/scratch GNUSTEP_INSTALLATION_DOMAIN=LOCAL
+   # headers: <scratch>$(gnustep-config --variable=GNUSTEP_LOCAL_HEADERS)
+   # libs:    <scratch>$(gnustep-config --variable=GNUSTEP_LOCAL_LIBRARIES)
+   make -C <copy of Tests/ExternalHost> GTS_INCLUDE=<headers> GTS_LIB=<libs>
+   LD_LIBRARY_PATH=<libs> ./obj/gts-external-host ...
+   ```
+   `GTS_SHOTS_ONLY=I scripts/screenshots.sh` does exactly this inside its
+   scratch root and checks the result (scenario I).
+2. **Compiling the sources in (what the standalone app, DemoNotes and the
+   host check do).** Include `gts-config.make` so GnuTLS is detected and
+   linked explicitly, and compile `ThemeSettingsKit/GTS*.m` and
+   `ThemeSettingsUI/GTS*.m`.
+
+`GTSScreenshot` and `GTSScriptRunner` are review/test tooling and are not
+part of the library. `performScriptedAction:` on the editor is public but
+is meant for tests. The editor's ivars are visible in its header; with the
+GCC runtime, ivar layout is fragile, so hosts must not subclass the editor
+across library versions. No libobjc2-only features are used.
 
 **Wiring (in this order)**
 ```objc
@@ -125,9 +151,9 @@ target.
 
 **Prerequisites (each needs evidence first)**
 1. Done: `-lastApplyOutcome` on the model, with tests (GTSApplyOutcomeTests).
-2. A packaged `libThemeSettingsUI` (headers plus library), so the pane does
-   not compile our sources into itself; a build test against the installed
-   library in a scratch prefix, never a global install.
+2. Done: `libThemeSettingsUI` + `libThemeSettingsKit` with public headers,
+   staged into a scratch prefix and used by an out-of-tree host (scenario
+   I). A pane bundle linking them has not been built.
 3. Pane lifecycle: `willUnselect`/`shouldUnselect` mapped to the unsaved-
    changes prompt; GUI test on a private Xvfb with scratch defaults.
 4. Target discovery in the pane process: the same `GTSThemeCatalog` roots as
@@ -139,7 +165,8 @@ target.
 
 **Tests needed before any pane replacement**
 * The model and store suites (existing, currently 110 tests, self-run),
-  the harness self-test, and the callback host check (scenario H).
+  the harness self-test, the callback host check (scenario H) and the
+  installed-library smoke (scenario I).
 * Pane-hosted GUI scenarios matching A to G in `scripts/screenshots.sh`:
   global, app explicit/inherited/Info.plist, Apply/Cancel/Reset, free-form
   commit, live receipt wording, unreadable target refused, AppImage

@@ -53,6 +53,15 @@ wrappedHeight(NSString *text, float width, float size)
 - (id) initWithModel: (GTSEditorModel*)model
 {
   NSRect frame = NSMakeRect(0, 0, kMargin * 2 + kLabelW + kControlW + kResetW + kGap * 2, 460);
+  /* The editor only renders a GTSEditorModel. This class reference is also
+     what records libThemeSettingsKit as a NEEDED dependency of the shared
+     UI library (message sends alone would let --as-needed drop it). */
+  if (![model isKindOfClass: [GTSEditorModel class]])
+    {
+      [self release];
+      [NSException raise: NSInvalidArgumentException
+                  format: @"GTSThemeSettingsEditor needs a GTSEditorModel"];
+    }
   if ((self = [super init]) == nil) return nil;
   _model = [model retain];
 
