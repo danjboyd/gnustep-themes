@@ -19,7 +19,10 @@ enum {
   GTSErrorUnsupportedVersion = 3,
   GTSErrorConflict = 10,
   GTSErrorWriteFailed = 11,
-  GTSErrorUnsafeDefaultsRoot = 12
+  GTSErrorUnsafeDefaultsRoot = 12,
+  GTSErrorUnreadableDomain = 13,
+  GTSErrorInvalidArgument = 14,
+  GTSErrorUnsupportedFeature = 15
 };
 
 typedef enum {

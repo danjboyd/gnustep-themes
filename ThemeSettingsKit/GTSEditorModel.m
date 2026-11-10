@@ -64,30 +64,48 @@
 {
   [_store release]; [_catalog release]; [_appDomain release]; [_appName release];
   [_appInfo release]; [_session release]; [_globalBaseline release]; [_message release];
+  [_hostDomain release];
   [super dealloc];
 }
 
 - (void) setMessage: (NSString*)m { ASSIGN(_message, m); }
 - (NSString*) message { return _message; }
 
-- (void) setTargetGlobal
+- (BOOL) openSessionForDomain: (NSString*)domain
 {
-  DESTROY(_appDomain); DESTROY(_appName); DESTROY(_appInfo); DESTROY(_globalBaseline);
-  ASSIGN(_session, [[[GTSEditSession alloc] initWithStore: _store domain: NSGlobalDomain] autorelease]);
-  [self setMessage: nil];
+  NSError *err = nil;
+  GTSEditSession *s = [[[GTSEditSession alloc] initWithStore: _store domain: domain error: &err] autorelease];
+  ASSIGN(_session, s);
+  [self setMessage: s ? nil : [err localizedDescription]];
+  return s != nil;
 }
 
-- (void) setTargetApplicationDomain: (NSString*)domain
+- (BOOL) setTargetGlobal
+{
+  DESTROY(_appDomain); DESTROY(_appName); DESTROY(_appInfo); DESTROY(_globalBaseline);
+  return [self openSessionForDomain: NSGlobalDomain];
+}
+
+- (BOOL) setTargetApplicationDomain: (NSString*)domain
                         displayName: (NSString*)name
                                info: (NSDictionary*)info
 {
+  NSError *err = nil;
   ASSIGN(_appDomain, domain);
   ASSIGN(_appName, (name ? name : domain));
   ASSIGN(_appInfo, info);
-  ASSIGN(_globalBaseline, [_store snapshotForDomain: NSGlobalDomain]);
-  ASSIGN(_session, [[[GTSEditSession alloc] initWithStore: _store domain: domain] autorelease]);
-  [self setMessage: nil];
+  ASSIGN(_globalBaseline, [_store snapshotForDomain: NSGlobalDomain error: &err]);
+  if (_globalBaseline == nil)
+    {
+      DESTROY(_session);
+      [self setMessage: [err localizedDescription]];
+      return NO;
+    }
+  return [self openSessionForDomain: domain];
 }
+
+- (void) setHostDomain: (NSString*)domain { ASSIGN(_hostDomain, domain); }
+- (BOOL) isEditable { return _session != nil && ![_session needsRebase]; }
 
 - (BOOL) targetIsGlobal { return _appDomain == nil; }
 - (GTSEditSession*) session { return _session; }
@@ -101,7 +119,9 @@
 - (GTSSettingsResolver*) resolver
 {
   GTSDomainSnapshot *pending = [_session pendingSnapshot];
-  if ([self targetIsGlobal])
+  if (_session == nil)
+    pending = [[[GTSDomainSnapshot alloc] initWithDomainName: @"" values: nil] autorelease];
+  if ([self targetIsGlobal] || _session == nil)
     return [[[GTSSettingsResolver alloc] initWithGlobal: pending application: nil
                                         applicationInfo: nil] autorelease];
   return [[[GTSSettingsResolver alloc] initWithGlobal: _globalBaseline application: pending
@@ -252,6 +272,8 @@ stateText(GTSResolvedValue *v, BOOL global)
   NSEnumerator *e = [(_showUnstable ? [sc settings] : [sc publicSettings]) objectEnumerator];
   GTSSettingDescriptor *s;
 
+  if (_session == nil) return rows;
+
   while ((s = [e nextObject]) != nil)
     {
       GTSResolvedValue *v;
@@ -360,30 +382,63 @@ stateText(GTSResolvedValue *v, BOOL global)
 - (BOOL) hasChanges { return [_session hasChanges]; }
 - (BOOL) needsRestart { return [_session needsRestart]; }
 
+- (BOOL) editsHostProcess
+{
+  return _hostDomain != nil && [[_session domain] isEqual: _hostDomain];
+}
+
 - (BOOL) apply
 {
   NSArray *conflicts = nil;
   NSError *err = nil;
-  int req = [_session applyRequirement];
-  if ([_session applyWithConflicts: &conflicts error: &err])
+  GTSApplyReceipt *r;
+  int req;
+
+  if (_session == nil) return NO;
+  r = [_session applyWithConflicts: &conflicts error: &err];
+  if (r != nil)
     {
-      [self setMessage: req == GTSApplyRestart
-        ? @"Saved. Restart the affected applications to see every change."
-        : (req == GTSApplyNewWindows ? @"Saved. Newly opened windows and panels use the new settings." : @"Saved.")];
+      NSString *m;
+      req = [r applyRequirement];
+      if ([[r committedChanges] count] == 0)
+        m = @"Nothing to save.";
+      else if (req == GTSApplyRestart)
+        m = @"Saved. Restart the affected applications to see every change.";
+      else if (req == GTSApplyNewWindows)
+        m = @"Saved. Windows and panels opened from now on use the new settings.";
+      else if ([self editsHostProcess])
+        m = @"Saved. This application picks the change up as it runs.";
+      else
+        m = @"Saved. Running applications that watch these settings may update; "
+            @"a restart is the guaranteed way to see them.";
+      if ([r refreshFailed])
+        m = [m stringByAppendingFormat: @" However, the settings could not be re-read (%@); "
+          @"reload before changing anything else. Do not save the same change again.",
+          [[r refreshError] localizedDescription]];
+      [self setMessage: m];
       if (![self targetIsGlobal])
-        ASSIGN(_globalBaseline, [_store snapshotForDomain: NSGlobalDomain]);
+        {
+          GTSDomainSnapshot *g = [_store snapshotForDomain: NSGlobalDomain error: NULL];
+          if (g != nil) ASSIGN(_globalBaseline, g);
+        }
       return YES;
     }
   if ([conflicts count] > 0)
     {
-      [_session rebase];
-      [self setMessage: [NSString stringWithFormat:
-        @"Not saved: %@ changed elsewhere since you opened this. The current values are now shown "
-        @"with your changes kept; press Apply again to overwrite.",
-        [[conflicts valueForKey: @"key"] componentsJoinedByString: @", "]]];
+      NSError *rebaseErr = nil;
+      if ([_session rebaseWithError: &rebaseErr] != nil)
+        [self setMessage: [NSString stringWithFormat:
+          @"Not saved: %@ changed elsewhere since you opened this. The current values are now shown "
+          @"with your changes kept; press Apply again to overwrite.",
+          [[conflicts valueForKey: @"key"] componentsJoinedByString: @", "]]];
+      else
+        [self setMessage: [NSString stringWithFormat:
+          @"Not saved: %@ changed elsewhere, and the current values could not be read (%@).",
+          [[conflicts valueForKey: @"key"] componentsJoinedByString: @", "],
+          [rebaseErr localizedDescription]]];
     }
   else
-    [self setMessage: [err localizedDescription]];
+    [self setMessage: [NSString stringWithFormat: @"Not saved: %@", [err localizedDescription]]];
   return NO;
 }
 
@@ -393,10 +448,27 @@ stateText(GTSResolvedValue *v, BOOL global)
   [self setMessage: nil];
 }
 
-- (void) reload
+- (BOOL) reload
 {
-  [_session rebase];
+  NSError *err = nil;
+  if (_session == nil)
+    return [self targetIsGlobal] ? [self setTargetGlobal]
+      : [self setTargetApplicationDomain: _appDomain displayName: _appName info: _appInfo];
+  if ([_session rebaseWithError: &err] == nil)
+    {
+      [self setMessage: [NSString stringWithFormat: @"Could not reload: %@", [err localizedDescription]]];
+      return NO;
+    }
   if (![self targetIsGlobal])
-    ASSIGN(_globalBaseline, [_store snapshotForDomain: NSGlobalDomain]);
+    {
+      GTSDomainSnapshot *g = [_store snapshotForDomain: NSGlobalDomain error: &err];
+      if (g == nil)
+        {
+          [self setMessage: [NSString stringWithFormat: @"Could not reload: %@", [err localizedDescription]]];
+          return NO;
+        }
+      ASSIGN(_globalBaseline, g);
+    }
+  return YES;
 }
 @end

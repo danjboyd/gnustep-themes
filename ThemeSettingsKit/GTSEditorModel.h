@@ -53,14 +53,22 @@
   GTSDomainSnapshot *_globalBaseline;   /* for app targets */
   BOOL _showUnstable;
   NSString *_message;
+  NSString *_hostDomain;       /* domain of the process showing the editor */
 }
 - (id) initWithStore: (GTSDefaultsDomainStore*)store catalog: (GTSThemeCatalog*)catalog;
 
-- (void) setTargetGlobal;
+/* Both return NO (see -message) if the domain cannot be read reliably;
+   the editor then shows nothing editable. */
+- (BOOL) setTargetGlobal;
 /* displayName for UI; info = the app's Info dictionary (may be nil). */
-- (void) setTargetApplicationDomain: (NSString*)domain
+- (BOOL) setTargetApplicationDomain: (NSString*)domain
                         displayName: (NSString*)name
                                info: (NSDictionary*)info;
+/* The domain of the process hosting the editor (in-app pane), or nil for
+   the standalone configurator. Only edits to the host's own domain can be
+   confirmed as applied live; other processes may need a restart. */
+- (void) setHostDomain: (NSString*)domain;
+- (BOOL) isEditable;
 - (BOOL) targetIsGlobal;
 - (NSString*) targetTitle;
 - (GTSEditSession*) session;
@@ -85,6 +93,6 @@
 - (BOOL) needsRestart;
 - (BOOL) apply;          /* NO: see -message; on conflict the model rebased */
 - (void) cancel;
-- (void) reload;         /* pick up external edits, keep staged changes */
+- (BOOL) reload;         /* pick up external edits, keep staged changes */
 - (NSString*) message;   /* last error/conflict/restart text, or nil */
 @end

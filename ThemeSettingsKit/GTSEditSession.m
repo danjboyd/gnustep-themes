@@ -10,17 +10,37 @@ same(id a, id b)
   return [a isEqual: b];
 }
 
+@implementation GTSApplyReceipt
+- (void) dealloc
+{
+  [_committed release]; [_refreshError release];
+  [super dealloc];
+}
+- (NSDictionary*) committedChanges { return _committed; }
+- (int) applyRequirement { return _requirement; }
+- (BOOL) refreshFailed { return _refreshFailed; }
+- (NSError*) refreshError { return _refreshError; }
+@end
+
 @implementation GTSEditSession
 
-- (id) initWithStore: (GTSDefaultsDomainStore*)store domain: (NSString*)domain
+- (id) initWithStore: (GTSDefaultsDomainStore*)store
+              domain: (NSString*)domain
+               error: (NSError**)error
 {
+  GTSDomainSnapshot *b = [store snapshotForDomain: domain error: error];
+  if (b == nil)
+    {
+      [self release];
+      return nil;
+    }
   if ((self = [super init]) != nil)
     {
       _store = [store retain];
       _domain = [domain copy];
       _staged = [[NSMutableDictionary alloc] init];
       _applyByKey = [[NSMutableDictionary alloc] init];
-      _baseline = [[store snapshotForDomain: domain] retain];
+      _baseline = [b retain];
     }
   return self;
 }
@@ -36,10 +56,11 @@ same(id a, id b)
 - (GTSDomainSnapshot*) baseline { return _baseline; }
 - (NSDictionary*) stagedChanges { return [[_staged copy] autorelease]; }
 - (BOOL) hasChanges { return [_staged count] > 0; }
+- (BOOL) needsRebase { return _needsRebase; }
 
-- (int) applyRequirement
+- (int) requirementForKeys: (NSArray*)keys
 {
-  NSEnumerator *e = [_staged keyEnumerator];
+  NSEnumerator *e = [keys objectEnumerator];
   NSString *k;
   int req = GTSApplyLive;
   while ((k = [e nextObject]) != nil)
@@ -50,23 +71,35 @@ same(id a, id b)
   return req;
 }
 
+- (int) applyRequirement
+{
+  return [self requirementForKeys: [_staged allKeys]];
+}
+
 - (BOOL) needsRestart
 {
   return [self applyRequirement] == GTSApplyRestart;
 }
 
-- (GTSDomainSnapshot*) pendingSnapshot
+static NSDictionary *
+applyChanges(NSDictionary *base, NSDictionary *changes)
 {
-  NSMutableDictionary *d = [[[_baseline values] mutableCopy] autorelease];
-  NSEnumerator *e = [_staged keyEnumerator];
+  NSMutableDictionary *d = [[base mutableCopy] autorelease];
+  NSEnumerator *e = [changes keyEnumerator];
   NSString *k;
   while ((k = [e nextObject]) != nil)
     {
-      id v = [_staged objectForKey: k];
+      id v = [changes objectForKey: k];
       if (v == GTSRemoveValue) [d removeObjectForKey: k];
       else [d setObject: v forKey: k];
     }
-  return [[[GTSDomainSnapshot alloc] initWithDomainName: _domain values: d] autorelease];
+  return d;
+}
+
+- (GTSDomainSnapshot*) pendingSnapshot
+{
+  return [[[GTSDomainSnapshot alloc] initWithDomainName: _domain
+    values: applyChanges([_baseline values], _staged)] autorelease];
 }
 
 - (void) stage: (id)v key: (NSString*)key apply: (int)apply
@@ -89,8 +122,7 @@ same(id a, id b)
       if (problem) *problem = p;
       return NO;
     }
-  [self stage: [s storedFormOfValue: value] key: [s key]
-        apply: [s applyPolicy]];
+  [self stage: [s storedFormOfValue: value] key: [s key] apply: [s applyPolicy]];
   return YES;
 }
 
@@ -109,19 +141,24 @@ same(id a, id b)
   [_staged removeAllObjects];
 }
 
-- (NSArray*) rebase
+- (NSArray*) rebaseWithError: (NSError**)error
 {
-  GTSDomainSnapshot *fresh = [_store snapshotForDomain: _domain];
-  NSMutableSet *keys = [NSMutableSet setWithArray: [[_baseline values] allKeys]];
+  GTSDomainSnapshot *fresh = [_store snapshotForDomain: _domain error: error];
+  NSMutableSet *keys;
   NSMutableArray *changed = [NSMutableArray array];
   NSEnumerator *e;
   NSString *k;
+
+  if (fresh == nil)
+    return nil;                         /* keep baseline + staged */
+  keys = [NSMutableSet setWithArray: [[_baseline values] allKeys]];
   [keys addObjectsFromArray: [[fresh values] allKeys]];
   e = [keys objectEnumerator];
   while ((k = [e nextObject]) != nil)
     if (!same([_baseline objectForKey: k], [fresh objectForKey: k]))
       [changed addObject: k];
   ASSIGN(_baseline, fresh);
+  _needsRebase = NO;
   /* Drop staged entries that now equal the on-disk state. */
   e = [[_staged allKeys] objectEnumerator];
   while ((k = [e nextObject]) != nil)
@@ -133,18 +170,45 @@ same(id a, id b)
   return [changed sortedArrayUsingSelector: @selector(compare:)];
 }
 
-- (BOOL) applyWithConflicts: (NSArray**)conflicts error: (NSError**)error
+- (GTSApplyReceipt*) applyWithConflicts: (NSArray**)conflicts error: (NSError**)error
 {
-  if ([_staged count] == 0)
+  GTSApplyReceipt *r;
+  GTSDomainSnapshot *fresh;
+  NSError *refreshErr = nil;
+  NSDictionary *committed;
+
+  if (conflicts) *conflicts = nil;
+  if (_needsRebase)
     {
-      if (conflicts) *conflicts = nil;
-      return YES;
+      if (error) *error = [NSError errorWithDomain: GTSErrorDomain code: GTSErrorUnreadableDomain
+        userInfo: [NSDictionary dictionaryWithObject:
+          @"settings must be reloaded before saving again" forKey: NSLocalizedDescriptionKey]];
+      return nil;
     }
-  if (![_store commitChanges: _staged toDomain: _domain baseline: _baseline
+  committed = [[_staged copy] autorelease];
+  r = [[[GTSApplyReceipt alloc] init] autorelease];
+  r->_committed = [committed retain];
+  r->_requirement = [self requirementForKeys: [committed allKeys]];
+  if ([committed count] == 0)
+    return r;
+  if (![_store commitChanges: committed toDomain: _domain baseline: _baseline
                    conflicts: conflicts error: error])
-    return NO;
+    return nil;
+
   [_staged removeAllObjects];
-  ASSIGN(_baseline, [_store snapshotForDomain: _domain]);
-  return YES;
+  fresh = [_store snapshotForDomain: _domain error: &refreshErr];
+  if (fresh != nil)
+    ASSIGN(_baseline, fresh);
+  else
+    {
+      /* Saved, but we could not re-read: remember what we wrote, refuse
+         further applies until a successful rebase. */
+      ASSIGN(_baseline, [[[GTSDomainSnapshot alloc] initWithDomainName: _domain
+        values: applyChanges([_baseline values], committed)] autorelease]);
+      _needsRebase = YES;
+      r->_refreshFailed = YES;
+      r->_refreshError = [refreshErr retain];
+    }
+  return r;
 }
 @end

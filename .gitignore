@@ -2,3 +2,4 @@ obj/
 *.bundle/
 *.app/
 derived_src/
+Tests/RootProbe/obj/

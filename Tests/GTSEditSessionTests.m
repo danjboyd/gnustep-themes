@@ -25,8 +25,8 @@ gumdrop(void)
   GTSRequireIsolatedDefaults();
   store = [[GTSDefaultsDomainStore alloc] init];
   app = [GTSUniqueDomain(@"session") retain];
-  GTSRunDefaults([NSArray arrayWithObjects: @"write", app, @"GSTheme", @"Gumdrop", nil]);
-  GTSRunDefaults([NSArray arrayWithObjects: @"write", app, @"Unrelated", @"u", nil]);
+  GTSMustRunDefaults([NSArray arrayWithObjects: @"write", app, @"GSTheme", @"Gumdrop", nil]);
+  GTSMustRunDefaults([NSArray arrayWithObjects: @"write", app, @"Unrelated", @"u", nil]);
 }
 
 - (void) tearDown
@@ -37,7 +37,7 @@ gumdrop(void)
 
 - (void) testCancelWritesNothing
 {
-  GTSEditSession *s = [[[GTSEditSession alloc] initWithStore: store domain: app] autorelease];
+  GTSEditSession *s = [[[GTSEditSession alloc] initWithStore: store domain: app error: NULL] autorelease];
   XCTAssertTrue([s stageValue: @"MENUBAR" forSetting: gumdrop() problem: NULL]);
   XCTAssertTrue([s hasChanges]);
   XCTAssertTrue([s needsRestart]);
@@ -45,29 +45,29 @@ gumdrop(void)
   XCTAssertNil(GTSExternalRead(app, @"GumdropMenuStyle"), @"staging must not touch disk");
   [s discardChanges];
   XCTAssertFalse([s hasChanges]);
-  XCTAssertTrue([s applyWithConflicts: NULL error: NULL]);
+  XCTAssertNotNil([s applyWithConflicts: NULL error: NULL]);
   XCTAssertNil(GTSExternalRead(app, @"GumdropMenuStyle"));
 }
 
 - (void) testApplyWritesCanonicalValueAndRebaselines
 {
-  GTSEditSession *s = [[[GTSEditSession alloc] initWithStore: store domain: app] autorelease];
+  GTSEditSession *s = [[[GTSEditSession alloc] initWithStore: store domain: app error: NULL] autorelease];
   XCTAssertTrue([s stageValue: @"MenuBar" forSetting: gumdrop() problem: NULL]);
-  XCTAssertTrue([s applyWithConflicts: NULL error: NULL]);
+  XCTAssertNotNil([s applyWithConflicts: NULL error: NULL]);
   XCTAssertEqualObjects(GTSExternalRead(app, @"GumdropMenuStyle"), @"menubar");
   XCTAssertEqualObjects(GTSExternalRead(app, @"Unrelated"), @"u");
   XCTAssertFalse([s hasChanges]);
   XCTAssertEqualObjects([[s baseline] objectForKey: @"GumdropMenuStyle"], @"menubar");
 
   [s stageResetForSetting: gumdrop()];
-  XCTAssertTrue([s applyWithConflicts: NULL error: NULL]);
+  XCTAssertNotNil([s applyWithConflicts: NULL error: NULL]);
   XCTAssertNil(GTSExternalRead(app, @"GumdropMenuStyle"), @"reset removes the key");
   XCTAssertEqualObjects(GTSExternalRead(app, @"GSTheme"), @"Gumdrop");
 }
 
 - (void) testInvalidValueRejected
 {
-  GTSEditSession *s = [[[GTSEditSession alloc] initWithStore: store domain: app] autorelease];
+  GTSEditSession *s = [[[GTSEditSession alloc] initWithStore: store domain: app error: NULL] autorelease];
   NSString *problem = nil;
   XCTAssertFalse([s stageValue: @"sideways" forSetting: gumdrop() problem: &problem]);
   XCTAssertNotNil(problem);
@@ -76,7 +76,7 @@ gumdrop(void)
 
 - (void) testStagingBaselineValueUnstages
 {
-  GTSEditSession *s = [[[GTSEditSession alloc] initWithStore: store domain: app] autorelease];
+  GTSEditSession *s = [[[GTSEditSession alloc] initWithStore: store domain: app error: NULL] autorelease];
   [s stageThemeSelection: @"Adwaita"];
   XCTAssertTrue([s hasChanges]);
   [s stageThemeSelection: @"Gumdrop"];
@@ -87,29 +87,29 @@ gumdrop(void)
 
 - (void) testConflictKeepsStagedChangesAndRebaseResolves
 {
-  GTSEditSession *s = [[[GTSEditSession alloc] initWithStore: store domain: app] autorelease];
+  GTSEditSession *s = [[[GTSEditSession alloc] initWithStore: store domain: app error: NULL] autorelease];
   NSArray *conflicts = nil, *changed;
   [s stageThemeSelection: @"Adwaita"];
-  GTSRunDefaults([NSArray arrayWithObjects: @"write", app, @"GSTheme", @"WinUITheme", nil]);
-  XCTAssertFalse([s applyWithConflicts: &conflicts error: NULL]);
+  GTSMustRunDefaults([NSArray arrayWithObjects: @"write", app, @"GSTheme", @"WinUITheme", nil]);
+  XCTAssertNil([s applyWithConflicts: &conflicts error: NULL]);
   XCTAssertEqualObjects([[conflicts lastObject] currentValue], @"WinUITheme");
   XCTAssertTrue([s hasChanges]);
   XCTAssertEqualObjects(GTSExternalRead(app, @"GSTheme"), @"WinUITheme");
 
-  changed = [s rebase];
+  changed = [s rebaseWithError: NULL];
   XCTAssertEqualObjects(changed, [NSArray arrayWithObject: @"GSTheme"]);
   XCTAssertTrue([s hasChanges], @"user's choice survives rebase");
-  XCTAssertTrue([s applyWithConflicts: &conflicts error: NULL]);
+  XCTAssertNotNil([s applyWithConflicts: &conflicts error: NULL]);
   XCTAssertEqualObjects(GTSExternalRead(app, @"GSTheme"), @"Adwaita");
 }
 
 - (void) testThemeSwitchLeavesInactiveThemeValues
 {
   GTSEditSession *s;
-  GTSRunDefaults([NSArray arrayWithObjects: @"write", app, @"GumdropMenuStyle", @"menubar", nil]);
-  s = [[[GTSEditSession alloc] initWithStore: store domain: app] autorelease];
+  GTSMustRunDefaults([NSArray arrayWithObjects: @"write", app, @"GumdropMenuStyle", @"menubar", nil]);
+  s = [[[GTSEditSession alloc] initWithStore: store domain: app error: NULL] autorelease];
   [s stageThemeSelection: nil];   /* inherit theme from global */
-  XCTAssertTrue([s applyWithConflicts: NULL error: NULL]);
+  XCTAssertNotNil([s applyWithConflicts: NULL error: NULL]);
   XCTAssertNil(GTSExternalRead(app, @"GSTheme"));
   XCTAssertEqualObjects(GTSExternalRead(app, @"GumdropMenuStyle"), @"menubar");
 }

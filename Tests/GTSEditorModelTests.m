@@ -24,14 +24,14 @@
   model = [[GTSEditorModel alloc] initWithStore: [[[GTSDefaultsDomainStore alloc] init] autorelease]
                                         catalog: catalog];
   app = [GTSUniqueDomain(@"editor") retain];
-  GTSRunDefaults([NSArray arrayWithObjects: @"write", @"NSGlobalDomain", @"GSTheme", @"Gumdrop", nil]);
+  GTSMustRunDefaults([NSArray arrayWithObjects: @"write", @"NSGlobalDomain", @"GSTheme", @"Gumdrop", nil]);
   [model setTargetApplicationDomain: app displayName: @"Demo"
     info: [NSDictionary dictionaryWithObject: @"menubar" forKey: @"GumdropMenuStyle"]];
 }
 
 - (void) tearDown
 {
-  GTSRunDefaults([NSArray arrayWithObjects: @"delete", @"NSGlobalDomain", @"GSTheme", nil]);
+  GTSMustRunDefaults([NSArray arrayWithObjects: @"delete", @"NSGlobalDomain", @"GSTheme", nil]);
   [model release]; model = nil;
   [app release]; app = nil;
 }
@@ -108,7 +108,7 @@
 
 - (void) testUnavailableSelectedThemeStaysVisible
 {
-  GTSRunDefaults([NSArray arrayWithObjects: @"write", app, @"GSTheme", @"Vanished", nil]);
+  GTSMustRunDefaults([NSArray arrayWithObjects: @"write", app, @"GSTheme", @"Vanished", nil]);
   [model reload];
   XCTAssertEqualObjects([[[model themeChoices] objectAtIndex: [model selectedThemeIndex]] title],
     @"Vanished (not installed)");
@@ -122,7 +122,7 @@
   GTSSettingRow *row = [self rowNamed: @"gumdrop.menu-style"];
   NSUInteger primary = [[[row choices] valueForKey: @"value"] indexOfObject: @"primary"];
   [model selectChoiceAtIndex: primary forRow: row];
-  GTSRunDefaults([NSArray arrayWithObjects: @"write", app, @"GumdropMenuStyle", @"menubar", nil]);
+  GTSMustRunDefaults([NSArray arrayWithObjects: @"write", app, @"GumdropMenuStyle", @"menubar", nil]);
   XCTAssertFalse([model apply]);
   XCTAssertTrue([[model message] rangeOfString: @"GumdropMenuStyle"].location != NSNotFound);
   XCTAssertTrue([model hasChanges], @"user's choice kept");
@@ -158,7 +158,7 @@
   XCTAssertEqual([[s settingWithIdentifier: @"t.b"] applyPolicy], GTSApplyNewWindows);
 
   session = [[[GTSEditSession alloc] initWithStore: [[[GTSDefaultsDomainStore alloc] init] autorelease]
-                                            domain: app] autorelease];
+                                            domain: app error: NULL] autorelease];
   XCTAssertEqual([session applyRequirement], (int)GTSApplyLive);
   [session stageValue: @"YES" forSetting: [s settingWithIdentifier: @"t.a"] problem: NULL];
   XCTAssertEqual([session applyRequirement], (int)GTSApplyLive);

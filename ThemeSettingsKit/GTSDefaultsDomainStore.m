@@ -1,6 +1,19 @@
 /* GTSDefaultsDomainStore.m */
 #import "GTSDefaultsDomainStore.h"
 #import "GTSThemeSettingsSchema.h"
+#include <unistd.h>
+
+static NSError *
+storeError(NSInteger code, NSString *fmt, ...)
+{
+  va_list ap;
+  NSString *msg;
+  va_start(ap, fmt);
+  msg = [[[NSString alloc] initWithFormat: fmt arguments: ap] autorelease];
+  va_end(ap);
+  return [NSError errorWithDomain: GTSErrorDomain code: code
+    userInfo: [NSDictionary dictionaryWithObject: msg forKey: NSLocalizedDescriptionKey]];
+}
 
 @implementation GTSDomainSnapshot
 - (id) initWithDomainName: (NSString*)name values: (NSDictionary*)values
@@ -58,11 +71,57 @@
 }
 @end
 
+@implementation GTSApplicationIdentity
+- (void) dealloc
+{
+  [_domain release]; [_info release]; [_problems release];
+  [super dealloc];
+}
+- (NSString*) domain { return _domain; }
+- (GTSIdentitySource) source { return _source; }
+- (NSDictionary*) infoDictionary { return _info; }
+- (NSArray*) problems { return _problems; }
+- (BOOL) isEstablished { return _source != GTSIdentityGuessedFromPath; }
+- (NSString*) description
+{
+  static const char *s[] = { "bundle-id", "executable", "GUESSED" };
+  return [NSString stringWithFormat: @"<app %@ (%s)%@>", _domain, s[_source],
+    [_problems count] ? [_problems description] : @""];
+}
+@end
+
 static BOOL
 sameValue(id a, id b)
 {
   if (a == nil || b == nil) return a == b;
   return [a isEqual: b];
+}
+
+static BOOL
+isPropertyList(id v, int depth)
+{
+  NSEnumerator *e;
+  id o;
+  if (depth > 32) return NO;
+  if ([v isKindOfClass: [NSString class]] || [v isKindOfClass: [NSNumber class]]
+    || [v isKindOfClass: [NSData class]] || [v isKindOfClass: [NSDate class]])
+    return YES;
+  if ([v isKindOfClass: [NSArray class]])
+    {
+      e = [v objectEnumerator];
+      while ((o = [e nextObject]) != nil)
+        if (!isPropertyList(o, depth + 1)) return NO;
+      return YES;
+    }
+  if ([v isKindOfClass: [NSDictionary class]])
+    {
+      e = [v keyEnumerator];
+      while ((o = [e nextObject]) != nil)
+        if (![o isKindOfClass: [NSString class]]
+          || !isPropertyList([v objectForKey: o], depth + 1)) return NO;
+      return YES;
+    }
+  return NO;
 }
 
 @implementation GTSDefaultsDomainStore
@@ -87,32 +146,125 @@ sameValue(id a, id b)
 
 - (NSUserDefaults*) hostDefaults { return _hostDefaults; }
 
-/* A new instance has no cached domains, so its first -synchronize loads
-   the current on-disk state. Caller releases. */
-- (NSUserDefaults*) newDedicatedDefaults
-{
-  NSUserDefaults *d = [[NSUserDefaults alloc] initWithUser: NSUserName()];
-  [d synchronize];
-  return d;
-}
-
-- (GTSDomainSnapshot*) snapshotUsing: (NSUserDefaults*)d domain: (NSString*)domainName
-{
-  return [[[GTSDomainSnapshot alloc] initWithDomainName: domainName
-    values: [d persistentDomainForName: domainName]] autorelease];
-}
-
 + (NSString*) defaultsRoot
 {
   return GSDefaultsRootForUser(NSUserName());
 }
 
-- (GTSDomainSnapshot*) snapshotForDomain: (NSString*)domainName
++ (BOOL) isValidDomainName: (id)name
 {
-  NSUserDefaults *d = [self newDedicatedDefaults];
-  GTSDomainSnapshot *s = [self snapshotUsing: d domain: domainName];
-  [d release];
-  return s;
+  return [name isKindOfClass: [NSString class]] && [name length] > 0
+    && [name rangeOfString: @"/"].location == NSNotFound
+    && ![name hasPrefix: @"."];
+}
+
+- (NSUserDefaults*) newDefaultsInstance
+{
+  return [[NSUserDefaults alloc] initWithUser: NSUserName()];
+}
+
+/* Checks GNUstep's file backend so that "unreadable" or "corrupt" never
+   turns into an empty, writable baseline. Returns NO + error if the domain
+   cannot be read reliably. *fileValues gets the parsed file (or nil if no
+   file exists). */
+- (BOOL) checkBackendForDomain: (NSString*)domainName
+                    fileValues: (NSDictionary**)fileValues
+                         error: (NSError**)error
+{
+  NSFileManager *fm = [NSFileManager defaultManager];
+  NSString *root = [[self class] defaultsRoot];
+  NSString *file = [root stringByAppendingPathComponent:
+    [domainName stringByAppendingPathExtension: @"plist"]];
+  BOOL isDir = NO;
+  id parsed;
+
+  *fileValues = nil;
+  if (![fm fileExistsAtPath: root isDirectory: &isDir])
+    return YES;                          /* fresh user: nothing stored yet */
+  if (!isDir || access([root fileSystemRepresentation], R_OK | X_OK) != 0)
+    {
+      if (error) *error = storeError(GTSErrorUnreadableDomain,
+        @"defaults directory %@ is not readable", root);
+      return NO;
+    }
+  if (![fm fileExistsAtPath: file])
+    return YES;                          /* absent domain */
+  if (access([file fileSystemRepresentation], R_OK) != 0)
+    {
+      if (error) *error = storeError(GTSErrorUnreadableDomain,
+        @"defaults for %@ exist but cannot be read (%@)", domainName, file);
+      return NO;
+    }
+  parsed = nil;
+  NS_DURING
+    parsed = [[NSString stringWithContentsOfFile: file] propertyList];
+  NS_HANDLER
+    parsed = nil;
+  NS_ENDHANDLER
+  if (parsed == nil)
+    {
+      NSData *raw = [NSData dataWithContentsOfFile: file];
+      if (raw != nil)
+        parsed = [NSPropertyListSerialization propertyListFromData: raw
+          mutabilityOption: NSPropertyListImmutable format: NULL errorDescription: NULL];
+    }
+  if (![parsed isKindOfClass: [NSDictionary class]])
+    {
+      if (error) *error = storeError(GTSErrorUnreadableDomain,
+        @"defaults for %@ are damaged and were left untouched (%@)", domainName, file);
+      return NO;
+    }
+  *fileValues = parsed;
+  return YES;
+}
+
+/* Fresh instance + backend check. Returns retained defaults via *out. */
+- (GTSDomainSnapshot*) loadDomain: (NSString*)domainName
+                         defaults: (NSUserDefaults**)outDefaults
+                            error: (NSError**)error
+{
+  NSUserDefaults *d;
+  NSDictionary *apiValues, *fileValues = nil;
+
+  if (outDefaults) *outDefaults = nil;
+  if (![[self class] isValidDomainName: domainName])
+    {
+      if (error) *error = storeError(GTSErrorInvalidArgument, @"invalid domain name %@", domainName);
+      return nil;
+    }
+  if (![self checkBackendForDomain: domainName fileValues: &fileValues error: error])
+    return nil;
+  d = [self newDefaultsInstance];
+  if (d == nil || ![d synchronize])
+    {
+      [d release];
+      if (error) *error = storeError(GTSErrorUnreadableDomain,
+        @"could not load defaults to read %@", domainName);
+      return nil;
+    }
+  apiValues = [d persistentDomainForName: domainName];
+  if (apiValues != nil && ![apiValues isKindOfClass: [NSDictionary class]])
+    {
+      [d release];
+      if (error) *error = storeError(GTSErrorUnreadableDomain, @"%@ is not a dictionary", domainName);
+      return nil;
+    }
+  /* The API saying "empty" while the file holds values means the API view
+     is not trustworthy for this domain: refuse. */
+  if ([apiValues count] == 0 && [fileValues count] > 0)
+    {
+      [d release];
+      if (error) *error = storeError(GTSErrorUnreadableDomain,
+        @"defaults for %@ could not be loaded consistently", domainName);
+      return nil;
+    }
+  if (outDefaults) *outDefaults = d; else [d release];
+  return [[[GTSDomainSnapshot alloc] initWithDomainName: domainName values: apiValues] autorelease];
+}
+
+- (GTSDomainSnapshot*) snapshotForDomain: (NSString*)domainName error: (NSError**)error
+{
+  return [self loadDomain: domainName defaults: NULL error: error];
 }
 
 - (NSArray*) conflictsForChanges: (NSDictionary*)changes
@@ -122,6 +274,8 @@ sameValue(id a, id b)
   NSMutableArray *out = [NSMutableArray array];
   NSEnumerator *e = [changes keyEnumerator];
   NSString *k;
+  if (![[baseline domainName] isEqual: [current domainName]])
+    return nil;
   while ((k = [e nextObject]) != nil)
     {
       id b = [baseline objectForKey: k], c = [current objectForKey: k];
@@ -137,6 +291,34 @@ sameValue(id a, id b)
   return out;
 }
 
+- (BOOL) validateChanges: (NSDictionary*)changes error: (NSError**)error
+{
+  NSEnumerator *e;
+  id k;
+  if (![changes isKindOfClass: [NSDictionary class]])
+    {
+      if (error) *error = storeError(GTSErrorInvalidArgument, @"changes must be a dictionary");
+      return NO;
+    }
+  e = [changes keyEnumerator];
+  while ((k = [e nextObject]) != nil)
+    {
+      id v = [changes objectForKey: k];
+      if (![k isKindOfClass: [NSString class]] || [k length] == 0)
+        {
+          if (error) *error = storeError(GTSErrorInvalidArgument, @"invalid defaults key %@", k);
+          return NO;
+        }
+      if (v != GTSRemoveValue && !isPropertyList(v, 0))
+        {
+          if (error) *error = storeError(GTSErrorInvalidArgument,
+            @"value for %@ is not a property list (%@)", k, [v class]);
+          return NO;
+        }
+    }
+  return YES;
+}
+
 - (BOOL) commitChanges: (NSDictionary*)changes
               toDomain: (NSString*)domainName
               baseline: (GTSDomainSnapshot*)baseline
@@ -147,24 +329,37 @@ sameValue(id a, id b)
   NSMutableDictionary *merged;
   NSEnumerator *e;
   NSString *k;
-  NSUserDefaults *d;
+  NSUserDefaults *d = nil;
   BOOL ok;
 
   if (conflicts) *conflicts = nil;
+  if (![[self class] isValidDomainName: domainName])
+    {
+      if (error) *error = storeError(GTSErrorInvalidArgument, @"invalid domain name %@", domainName);
+      return NO;
+    }
+  if (![self validateChanges: changes error: error])
+    return NO;
+  if (baseline != nil && ![[baseline domainName] isEqual: domainName])
+    {
+      if (error) *error = storeError(GTSErrorInvalidArgument,
+        @"baseline is for %@, not %@", [baseline domainName], domainName);
+      return NO;
+    }
   if ([changes count] == 0) return YES;
 
-  d = [[self newDedicatedDefaults] autorelease];
-  current = [self snapshotUsing: d domain: domainName];
+  current = [self loadDomain: domainName defaults: &d error: error];
+  if (current == nil)
+    return NO;
+  [d autorelease];
   if (baseline != nil)
     {
       NSArray *c = [self conflictsForChanges: changes baseline: baseline current: current];
-      if ([c count] > 0)
+      if (c == nil || [c count] > 0)
         {
           if (conflicts) *conflicts = c;
-          if (error) *error = [NSError errorWithDomain: GTSErrorDomain code: GTSErrorConflict
-            userInfo: [NSDictionary dictionaryWithObject:
-              [NSString stringWithFormat: @"%lu setting(s) in %@ were changed elsewhere",
-                (unsigned long)[c count], domainName] forKey: NSLocalizedDescriptionKey]];
+          if (error) *error = storeError(GTSErrorConflict,
+            @"%lu setting(s) in %@ were changed elsewhere", (unsigned long)[c count], domainName);
           return NO;
         }
     }
@@ -191,10 +386,9 @@ sameValue(id a, id b)
     [_hostDefaults synchronize];
   if (!ok)
     {
-      if (error) *error = [NSError errorWithDomain: GTSErrorDomain code: GTSErrorWriteFailed
-        userInfo: [NSDictionary dictionaryWithObject:
-          [NSString stringWithFormat: @"could not write defaults domain %@", domainName]
-          forKey: NSLocalizedDescriptionKey]];
+      if (error) *error = storeError(GTSErrorWriteFailed,
+        @"could not write defaults domain %@; its state is unknown, reload before retrying",
+        domainName);
       return NO;
     }
   return YES;
@@ -206,6 +400,11 @@ sameValue(id a, id b)
          conflicts: (NSArray**)conflicts
              error: (NSError**)error
 {
+  if (![key isKindOfClass: [NSString class]] || [key length] == 0)
+    {
+      if (error) *error = storeError(GTSErrorInvalidArgument, @"invalid defaults key %@", key);
+      return NO;
+    }
   return [self commitChanges: [NSDictionary dictionaryWithObject: GTSRemoveValue forKey: key]
                     toDomain: domainName baseline: baseline conflicts: conflicts error: error];
 }
@@ -226,20 +425,56 @@ sameValue(id a, id b)
   while ((c = [e nextObject]) != nil)
     {
       NSString *p = [appPath stringByAppendingPathComponent: c];
-      NSDictionary *d = [NSDictionary dictionaryWithContentsOfFile: p];
-      if (d != nil) return d;
+      NSDictionary *d = nil;
+      NS_DURING
+        d = [NSDictionary dictionaryWithContentsOfFile: p];
+      NS_HANDLER
+        d = nil;
+      NS_ENDHANDLER
+      if ([d isKindOfClass: [NSDictionary class]]) return d;
     }
   return nil;
 }
 
-+ (NSString*) applicationDomainForBundleAtPath: (NSString*)appPath
++ (GTSApplicationIdentity*) applicationIdentityForBundleAtPath: (NSString*)appPath
 {
+  GTSApplicationIdentity *ident = [[[GTSApplicationIdentity alloc] init] autorelease];
+  NSMutableArray *problems = [NSMutableArray array];
   NSDictionary *info = [self infoDictionaryForBundleAtPath: appPath];
-  NSString *s = [info objectForKey: @"CFBundleIdentifier"];
-  if ([s length] > 0) return s;
-  s = [info objectForKey: @"NSExecutable"];
-  if ([s length] == 0) s = [info objectForKey: @"CFBundleExecutable"];
-  if ([s length] > 0) return s;
-  return [[appPath lastPathComponent] stringByDeletingPathExtension];
+  NSArray *keys = [NSArray arrayWithObjects: @"CFBundleIdentifier", @"NSExecutable",
+    @"CFBundleExecutable", nil];
+  NSEnumerator *e = [keys objectEnumerator];
+  NSString *k;
+
+  ident->_info = [info retain];
+  if (info == nil)
+    [problems addObject: @"no readable Info plist"];
+  while (info != nil && (k = [e nextObject]) != nil)
+    {
+      id v = [info objectForKey: k];
+      if (v == nil) continue;
+      if (![v isKindOfClass: [NSString class]] || [v length] == 0)
+        {
+          [problems addObject: [NSString stringWithFormat: @"%@ is not a non-empty string", k]];
+          continue;
+        }
+      if (![self isValidDomainName: v])
+        {
+          [problems addObject: [NSString stringWithFormat: @"%@ \"%@\" is not usable as a domain", k, v]];
+          continue;
+        }
+      ident->_domain = [v copy];
+      ident->_source = [k isEqual: @"CFBundleIdentifier"]
+        ? GTSIdentityFromBundleIdentifier : GTSIdentityFromExecutable;
+      break;
+    }
+  if (ident->_domain == nil)
+    {
+      ident->_domain = [[[appPath lastPathComponent] stringByDeletingPathExtension] copy];
+      ident->_source = GTSIdentityGuessedFromPath;
+      [problems addObject: @"domain guessed from the bundle name; confirm before editing"];
+    }
+  ident->_problems = [problems copy];
+  return ident;
 }
 @end
