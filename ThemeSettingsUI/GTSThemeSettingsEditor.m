@@ -1,0 +1,280 @@
+/* GTSThemeSettingsEditor.m */
+#import "GTSThemeSettingsEditor.h"
+#import "GTSEditorModel.h"
+#import "GTSThemeCatalog.h"
+#import "GTSThemeSettingsSchema.h"
+
+/* Plain flipped container so rows lay out top-down. */
+@interface GTSFlippedView : NSView
+@end
+@implementation GTSFlippedView
+- (BOOL) isFlipped { return YES; }
+@end
+
+static const float kMargin = 16, kLabelW = 190, kControlW = 260, kResetW = 70, kGap = 8;
+
+static NSTextField *
+label(NSString *text, float size, BOOL bold, NSColor *color)
+{
+  NSTextField *t = [[[NSTextField alloc] initWithFrame: NSMakeRect(0, 0, 100, 20)] autorelease];
+  [t setStringValue: text ? text : @""];
+  [t setEditable: NO];
+  [t setSelectable: NO];
+  [t setBezeled: NO];
+  [t setDrawsBackground: NO];
+  [t setFont: bold ? [NSFont boldSystemFontOfSize: size] : [NSFont systemFontOfSize: size]];
+  if (color) [t setTextColor: color];
+  return t;
+}
+
+/* Height a wrapping label needs at a given width (rough but stable). */
+static float
+wrappedHeight(NSString *text, float width, float size)
+{
+  NSDictionary *a = [NSDictionary dictionaryWithObject: [NSFont systemFontOfSize: size]
+                                                forKey: NSFontAttributeName];
+  float lineW = [text sizeWithAttributes: a].width;
+  int lines = (int)(lineW / (width - 8)) + 1;
+  return lines * (size + 5) + 2;
+}
+
+@implementation GTSThemeSettingsEditor
+
+- (id) initWithModel: (GTSEditorModel*)model
+{
+  NSRect frame = NSMakeRect(0, 0, kMargin * 2 + kLabelW + kControlW + kResetW + kGap * 2, 460);
+  if ((self = [super init]) == nil) return nil;
+  _model = [model retain];
+
+  _view = [[NSView alloc] initWithFrame: frame];
+  [_view setAutoresizingMask: NSViewWidthSizable | NSViewHeightSizable];
+
+  _scroll = [[NSScrollView alloc] initWithFrame: NSMakeRect(0, 52, frame.size.width, frame.size.height - 52)];
+  [_scroll setHasVerticalScroller: YES];
+  [_scroll setBorderType: NSNoBorder];
+  [_scroll setAutoresizingMask: NSViewWidthSizable | NSViewHeightSizable];
+  _content = [[GTSFlippedView alloc] initWithFrame: NSMakeRect(0, 0, frame.size.width - 20, 400)];
+  [_scroll setDocumentView: _content];
+  [_view addSubview: _scroll];
+
+  _message = [label(@"", 11, NO, [NSColor darkGrayColor]) retain];
+  [_message setFrame: NSMakeRect(kMargin, 8, frame.size.width - 300, 36)];
+  [_message setAutoresizingMask: NSViewWidthSizable | NSViewMaxYMargin];
+  [_view addSubview: _message];
+
+  _reload = [[NSButton alloc] initWithFrame: NSMakeRect(frame.size.width - 270, 12, 80, 26)];
+  [_reload setTitle: @"Reload"];
+  [_reload setTarget: self];
+  [_reload setAction: @selector(reload:)];
+  [_reload setAutoresizingMask: NSViewMinXMargin | NSViewMaxYMargin];
+  [_view addSubview: _reload];
+
+  _cancel = [[NSButton alloc] initWithFrame: NSMakeRect(frame.size.width - 182, 12, 80, 26)];
+  [_cancel setTitle: @"Cancel"];
+  [_cancel setTarget: self];
+  [_cancel setAction: @selector(cancel:)];
+  [_cancel setAutoresizingMask: NSViewMinXMargin | NSViewMaxYMargin];
+  [_view addSubview: _cancel];
+
+  _apply = [[NSButton alloc] initWithFrame: NSMakeRect(frame.size.width - 94, 12, 80, 26)];
+  [_apply setTitle: @"Apply"];
+  [_apply setTarget: self];
+  [_apply setAction: @selector(apply:)];
+  [_apply setKeyEquivalent: @"\r"];
+  [_apply setAutoresizingMask: NSViewMinXMargin | NSViewMaxYMargin];
+  [_view addSubview: _apply];
+
+  [self reloadFromModel];
+  return self;
+}
+
+- (void) dealloc
+{
+  [_model release]; [_view release]; [_content release]; [_scroll release];
+  [_message release]; [_apply release]; [_cancel release]; [_reload release];
+  [_rows release];
+  [super dealloc];
+}
+
+- (GTSEditorModel*) model { return _model; }
+- (NSView*) view { return _view; }
+- (void) setDelegate: (id)delegate { _delegate = delegate; }
+
+- (NSPopUpButton*) popupWithChoices: (NSArray*)choices selected: (NSInteger)sel frame: (NSRect)f
+{
+  NSPopUpButton *p = [[[NSPopUpButton alloc] initWithFrame: f pullsDown: NO] autorelease];
+  NSEnumerator *e = [choices objectEnumerator];
+  GTSChoice *c;
+  while ((c = [e nextObject]) != nil)
+    [p addItemWithTitle: [c title]];
+  if (sel >= 0 && sel < [p numberOfItems]) [p selectItemAtIndex: sel];
+  return p;
+}
+
+- (void) reloadFromModel
+{
+  NSArray *subviews = [[[_content subviews] copy] autorelease];
+  NSEnumerator *e = [subviews objectEnumerator];
+  NSView *v;
+  float width = [_content frame].size.width;
+  float y = kMargin, x2 = kMargin + kLabelW + kGap, x3 = x2 + kControlW + kGap;
+  NSTextField *t;
+  NSPopUpButton *p;
+  NSString *note;
+  NSUInteger i;
+  BOOL editable = [_model isEditable];
+
+  while ((v = [e nextObject]) != nil)
+    [v removeFromSuperview];
+
+  /* Target */
+  t = label([NSString stringWithFormat: @"Settings for: %@", [_model targetTitle]], 13, YES, nil);
+  [t setFrame: NSMakeRect(kMargin, y, width - 2 * kMargin, 20)];
+  [_content addSubview: t];
+  y += 30;
+
+  /* Theme selection (independent of every setting) */
+  t = label(@"Theme", 12, YES, nil);
+  [t setFrame: NSMakeRect(kMargin, y + 3, kLabelW, 20)];
+  [_content addSubview: t];
+  p = [self popupWithChoices: [_model themeChoices] selected: [_model selectedThemeIndex]
+                       frame: NSMakeRect(x2, y, kControlW, 26)];
+  [p setTarget: self];
+  [p setAction: @selector(themeChanged:)];
+  [p setEnabled: editable];
+  [_content addSubview: p];
+  t = label([_model themeStateText], 10, NO, [NSColor grayColor]);
+  [t setFrame: NSMakeRect(x2, y + 27, kControlW + kResetW, 16)];
+  [_content addSubview: t];
+  y += 46;
+  note = [_model themeNote];
+  if ([note length] > 0)
+    {
+      float h = wrappedHeight(note, width - x2 - kMargin, 10);
+      t = label(note, 10, NO, [NSColor darkGrayColor]);
+      [[t cell] setWraps: YES];
+      [t setFrame: NSMakeRect(x2, y, width - x2 - kMargin, h)];
+      [_content addSubview: t];
+      y += h + 4;
+    }
+  y += 8;
+
+  /* Settings of the theme that applies to this target */
+  ASSIGN(_rows, [_model rows]);
+  if ([_rows count] > 0)
+    {
+      NSBox *sep = [[[NSBox alloc] initWithFrame: NSMakeRect(kMargin, y, width - 2 * kMargin, 1)] autorelease];
+      [sep setBoxType: NSBoxSeparator];
+      [_content addSubview: sep];
+      y += 12;
+    }
+  for (i = 0; i < [_rows count]; i++)
+    {
+      GTSSettingRow *row = [_rows objectAtIndex: i];
+      BOOL rowEditable = editable && ![row isReadOnly];
+      NSButton *reset;
+
+      t = label([row title], 12, NO, nil);
+      [t setFrame: NSMakeRect(kMargin, y + 3, kLabelW, 20)];
+      [_content addSubview: t];
+
+      if ([row isFreeForm])
+        {
+          NSTextField *f = [[[NSTextField alloc] initWithFrame: NSMakeRect(x2, y, kControlW, 24)] autorelease];
+          [f setStringValue: [row text] ? [row text] : @""];
+          [[f cell] setPlaceholderString: [[[row choices] objectAtIndex: 0] title]];
+          [f setTag: i];
+          [f setTarget: self];
+          [f setAction: @selector(textChanged:)];
+          [f setEnabled: rowEditable];
+          [_content addSubview: f];
+        }
+      else
+        {
+          p = [self popupWithChoices: [row choices] selected: [row selectedIndex]
+                               frame: NSMakeRect(x2, y, kControlW, 26)];
+          [p setTag: i];
+          [p setTarget: self];
+          [p setAction: @selector(choiceChanged:)];
+          [p setEnabled: rowEditable];
+          [_content addSubview: p];
+        }
+
+      reset = [[[NSButton alloc] initWithFrame: NSMakeRect(x3, y, kResetW, 26)] autorelease];
+      [reset setTitle: @"Reset"];
+      [reset setTag: i];
+      [reset setTarget: self];
+      [reset setAction: @selector(resetRow:)];
+      [reset setEnabled: rowEditable && [row canReset]];
+      [_content addSubview: reset];
+
+      t = label([row stateText], 10, NO, [NSColor grayColor]);
+      [t setFrame: NSMakeRect(x2, y + 27, kControlW + kResetW, 16)];
+      [_content addSubview: t];
+      y += 44;
+      if ([[row note] length] > 0)
+        {
+          float h = wrappedHeight([row note], width - x2 - kMargin, 10);
+          t = label([row note], 10, NO, [NSColor darkGrayColor]);
+          [[t cell] setWraps: YES];
+          [t setFrame: NSMakeRect(x2, y, width - x2 - kMargin, h)];
+          [_content addSubview: t];
+          y += h;
+        }
+      y += 10;
+    }
+
+  [_content setFrameSize: NSMakeSize(width, y + kMargin)];
+  [_content setNeedsDisplay: YES];
+  [_message setStringValue: [_model message] ? [_model message] : @""];
+  [_apply setEnabled: editable && [_model hasChanges]];
+  [_cancel setEnabled: [_model hasChanges]];
+}
+
+- (void) themeChanged: (id)sender
+{
+  [_model selectThemeChoiceAtIndex: [sender indexOfSelectedItem]];
+  [self reloadFromModel];
+}
+
+- (void) choiceChanged: (id)sender
+{
+  GTSSettingRow *row = [_rows objectAtIndex: [sender tag]];
+  [_model selectChoiceAtIndex: [sender indexOfSelectedItem] forRow: row];
+  [self reloadFromModel];
+}
+
+- (void) textChanged: (id)sender
+{
+  GTSSettingRow *row = [_rows objectAtIndex: [sender tag]];
+  [_model setText: [sender stringValue] forRow: row];
+  [self reloadFromModel];
+}
+
+- (void) resetRow: (id)sender
+{
+  [_model resetRow: [_rows objectAtIndex: [sender tag]]];
+  [self reloadFromModel];
+}
+
+- (void) apply: (id)sender
+{
+  BOOL ok = [_model apply];
+  [self reloadFromModel];
+  if (ok && _delegate != nil
+    && [_delegate respondsToSelector: @selector(themeSettingsEditorDidApply:)])
+    [_delegate themeSettingsEditorDidApply: self];
+}
+
+- (void) cancel: (id)sender
+{
+  [_model cancel];
+  [self reloadFromModel];
+}
+
+- (void) reload: (id)sender
+{
+  [_model reload];
+  [self reloadFromModel];
+}
+@end

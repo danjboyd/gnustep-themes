@@ -22,49 +22,87 @@ chmod 700 "$root"
 root=$(cd "$root" && pwd -P)
 sid=""
 grace=${GTS_STOP_GRACE:-5}
+unknown_file="$root/.unknown-pids"
 
-# PIDs in our session whose environment proves they belong to this run.
-owned_pids() {
+# Identity of a process: "pid:starttime" (starttime = field 22 of
+# /proc/<pid>/stat, so a recycled pid never matches an old record).
+proc_start() { sed -n 's/^.*) [A-Za-z] \([^ ]* \)\{18\}\([0-9]*\).*/\2/p' "/proc/$1/stat" 2>/dev/null; }
+proc_sid()   { sed -n 's/^.*) [A-Za-z] [0-9]* [0-9]* \([0-9]*\).*/\1/p' "/proc/$1/stat" 2>/dev/null; }
+has_marker() { { tr '\0' '\n' < "/proc/$1/environ"; } 2>/dev/null | grep -qxF -- "GTS_TEST_ROOT=$root"; }
+is_ours()    { [ "$(proc_sid "$1")" = "$sid" ] && has_marker "$1"; }
+
+# Members of our session: verified ones as "pid:start" on stdout; members
+# that cannot be verified are listed in $unknown_file (never signalled).
+scan_session() {
+  : > "$unknown_file"
   [ -n "$sid" ] || return 0
   ps -eo pid=,sid= | while read -r p s; do
-    [ "$s" = "$sid" ] || continue
-    if { tr "\0" "\n" < "/proc/$p/environ"; } 2>/dev/null | grep -qx "GTS_TEST_ROOT=$root"; then
-      echo "$p"
-    elif [ -e "/proc/$p" ]; then
-      echo "run-tests: process $p in session $sid could not be verified; not signalled" >&2
-    fi
+    [ "$s" = "$sid" ] && [ "$p" != "$$" ] || continue
+    st=$(proc_start "$p")
+    [ -n "$st" ] || continue                     # already gone
+    [ "$(sed -n 's/^.*) \([A-Za-z]\).*/\1/p' "/proc/$p/stat" 2>/dev/null)" = Z ] && continue   # exited, awaiting reap
+    if has_marker "$p"; then echo "$p:$st"; else echo "$p" >> "$unknown_file"; fi
+  done
+}
+
+# Signal only processes whose pid, start time, session and marker all
+# still match the record taken earlier.
+signal_verified() {   # SIG records...
+  sig=$1; shift
+  for rec in "$@"; do
+    p=${rec%%:*}; st=${rec#*:}
+    [ "$(proc_start "$p")" = "$st" ] && is_ours "$p" && kill "-$sig" "$p" 2>/dev/null || true
   done
 }
 
 wait_gone() {   # seconds
   n=$(( $1 * 10 ))
   while [ "$n" -gt 0 ]; do
-    [ -z "$(owned_pids)" ] && return 0
+    [ -z "$(scan_session)" ] && return 0
     sleep 0.1; n=$((n - 1))
   done
-  [ -z "$(owned_pids)" ]
+  [ -z "$(scan_session)" ]
 }
 
+# 0 = nothing of ours left and nothing unknown in the session; 1 otherwise.
 stop_owned() {
-  pids=$(owned_pids)
-  [ -n "$pids" ] || return 0
-  kill -TERM $pids 2>/dev/null || true
-  wait_gone "$grace" && return 0
-  pids=$(owned_pids)
-  [ -n "$pids" ] && kill -KILL $pids 2>/dev/null || true
-  wait_gone 2 && return 0
-  echo "run-tests: residual processes after KILL: $(owned_pids | tr '\n' ' ')" >&2
-  return 1
+  recs=$(scan_session)
+  if [ -n "$recs" ]; then
+    signal_verified TERM $recs
+    if ! wait_gone "$grace"; then
+      signal_verified KILL $(scan_session)
+      wait_gone 2 || echo "run-tests: residual processes after KILL: $(scan_session | tr '\n' ' ')" >&2
+    fi
+  fi
+  recs=$(scan_session)
+  if [ -s "$unknown_file" ]; then
+    echo "run-tests: unverifiable processes in the test session (not signalled): $(tr '\n' ' ' < "$unknown_file")" >&2
+    return 1
+  fi
+  [ -z "$recs" ]
+}
+
+leader_exited() {   # reapable without blocking: gone or zombie
+  [ -n "$sid" ] || return 1
+  state=$(sed -n 's/^.*) \([A-Za-z]\).*/\1/p' "/proc/$sid/stat" 2>/dev/null)
+  [ -z "$state" ] || [ "$state" = Z ]
 }
 
 finish() {
   status=$1
   trap '' INT TERM
   trap - EXIT
-  stop_owned || status=${status:-1}
-  [ -n "$sid" ] && wait "$sid" 2>/dev/null || true   # reap the leader
-  if ! rm -rf "$root"; then
-    echo "run-tests: could not remove $root" >&2
+  clean=1
+  stop_owned || clean=0
+  if leader_exited; then wait "$sid" 2>/dev/null || true; fi
+  if [ "$clean" -eq 1 ]; then
+    if ! rm -rf "$root"; then
+      echo "run-tests: could not remove $root" >&2
+      [ "$status" -ne 0 ] || status=1
+    fi
+  else
+    # Children may still use this config; deleting it could strand them.
+    echo "run-tests: KEEPING $root because processes remain; remove it once they are gone" >&2
     [ "$status" -ne 0 ] || status=1
   fi
   exit "$status"

@@ -1,0 +1,6 @@
+{
+  ApplicationName = "Theme Settings";
+  CFBundleIdentifier = "org.gnustep.ThemeSettings";
+  NSExecutable = ThemeSettings;
+  NSPrincipalClass = NSApplication;
+}

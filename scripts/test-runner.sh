@@ -50,6 +50,21 @@ took=$(( $(date +%s) - start ))
 [ -z "$(leftovers)" ] && ok "2 nothing left after KILL escalation" || bad "2 leftovers: $(leftovers)"
 [ -z "$(ls -d "$work"/gts-test.* 2>/dev/null)" ] && ok "2 scratch root removed" || bad "2 scratch root left"
 
+# 2b. forced unknown residual: a session member WITHOUT our marker cannot be
+#     verified, so it must not be signalled, the run must fail, and the
+#     scratch config must be kept.
+mkfake unmarked "env -u GTS_TEST_ROOT sh -c 'echo \$\$ > $work/unmarked.pid; exec sleep 300' & sleep 1; exit 0"
+GTS_SCRATCH="$work" GTS_STOP_GRACE=1 XCTEST="$work/unmarked" "$here/scripts/run-tests.sh" >/dev/null 2>"$work/2b.err"
+st=$?
+upid=$(cat "$work/unmarked.pid" 2>/dev/null)
+[ "$st" -ne 0 ] && ok "2b unknown residual fails the run ($st)" || bad "2b status 0 with an unverifiable member"
+[ -n "$upid" ] && kill -0 "$upid" 2>/dev/null && ok "2b unverifiable process was not signalled" || bad "2b unmarked process gone"
+kept=$(ls -d "$work"/gts-test.* 2>/dev/null)
+[ -n "$kept" ] && ok "2b scratch config kept" || bad "2b scratch config deleted"
+grep -q "unverifiable" "$work/2b.err" && ok "2b reported" || bad "2b not reported"
+[ -n "$upid" ] && kill "$upid" 2>/dev/null
+rm -rf $kept
+
 # 3. guard aborts before any write when the defaults root is outside GTS_TEST_ROOT
 mkdir -p "$work/A" "$work/B/user/Defaults"
 grep -v '^GNUSTEP_USER_CONFIG_FILE\|^GNUSTEP_USER_DEFAULTS_DIR\|^GNUSTEP_USER_DIR=' /etc/GNUstep/GNUstep.conf > "$work/B/GNUstep.conf"
