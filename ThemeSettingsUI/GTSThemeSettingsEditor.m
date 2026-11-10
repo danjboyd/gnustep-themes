@@ -435,27 +435,35 @@ fieldText(NSTextField *f)
      at a time, each with its own outcome. */
   if (_applying) return;
   _applying = YES;
-  /* End editing, then hand every field's visible text to the model, which
-     stages it or records a fresh Refused outcome (invalid text) and stops. */
-  pending = [self pendingTexts];
-  [[_view window] makeFirstResponder: nil];
-  [_model applyWithPendingTexts: pending];
-  /* Capture THIS attempt's outcome before any callback runs: a host that
-     edits or switches target inside one callback must not change what the
-     other receives. */
-  o = [[[_model lastApplyOutcome] retain] autorelease];
-  [self reloadFromModel];
-  if (_delegate != nil)
+  /* Reset the guard however we leave: an exception from the model, the view
+     or a host callback must not disable Apply for good. Not swallowed. */
+  @try
     {
-      /* Legacy: "something was written" (Saved or SavedRefreshFailed). It is
-         NOT proof that reload or live application succeeded; the outcome is
-         the authority. */
-      if ([o didWrite] && [_delegate respondsToSelector: @selector(themeSettingsEditorDidApply:)])
-        [_delegate themeSettingsEditorDidApply: self];
-      if (o != nil && [_delegate respondsToSelector: @selector(themeSettingsEditor:didFinishApplyWithOutcome:)])
-        [_delegate themeSettingsEditor: self didFinishApplyWithOutcome: o];
+      /* End editing, then hand every field's visible text to the model, which
+         stages it or records a fresh Refused outcome (invalid text) and stops. */
+      pending = [self pendingTexts];
+      [[_view window] makeFirstResponder: nil];
+      [_model applyWithPendingTexts: pending];
+      /* Capture THIS attempt's outcome before any callback runs: a host that
+         edits or switches target inside one callback must not change what the
+         other receives. */
+      o = [[[_model lastApplyOutcome] retain] autorelease];
+      [self reloadFromModel];
+      if (_delegate != nil)
+        {
+          /* Legacy: "something was written" (Saved or SavedRefreshFailed). It is
+             NOT proof that reload or live application succeeded; the outcome is
+             the authority. */
+          if ([o didWrite] && [_delegate respondsToSelector: @selector(themeSettingsEditorDidApply:)])
+            [_delegate themeSettingsEditorDidApply: self];
+          if (o != nil && [_delegate respondsToSelector: @selector(themeSettingsEditor:didFinishApplyWithOutcome:)])
+            [_delegate themeSettingsEditor: self didFinishApplyWithOutcome: o];
+        }
     }
-  _applying = NO;
+  @finally
+    {
+      _applying = NO;
+    }
 }
 
 - (void) cancel: (id)sender
