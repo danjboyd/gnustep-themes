@@ -171,6 +171,48 @@
   XCTAssertEqual([[m lastApplyOutcome] kind], GTSApplyOutcomeRefused);
 }
 
+- (GTSSettingRow*) fontRow: (GTSEditorModel*)m
+{
+  NSEnumerator *e = [[m rows] objectEnumerator];
+  GTSSettingRow *r;
+  while ((r = [e nextObject]) != nil)
+    if ([[[r setting] identifier] isEqual: @"adwaita.font-scale"]) return r;
+  return nil;
+}
+
+- (void) testInvalidPendingTextGivesFreshRefusedOutcome
+{
+  GTSEditorModel *m;
+  GTSApplyOutcome *first, *second;
+  GTSMustRunDefaults([NSArray arrayWithObjects: @"write", app, @"GSTheme", @"Adwaita", nil]);
+  m = [self modelWithStore: [[[GTSDefaultsDomainStore alloc] init] autorelease]];
+  /* Valid pending text (still being typed) is staged and saved. */
+  {
+    NSArray *pending = [NSArray arrayWithObject: [NSArray arrayWithObjects: [self fontRow: m], @"1.25", nil]];
+    BOOL ok = [m applyWithPendingTexts: pending];
+    XCTAssertTrue(ok);
+  }
+  first = [[[m lastApplyOutcome] retain] autorelease];
+  XCTAssertEqual([first kind], GTSApplyOutcomeSaved);
+  XCTAssertEqualObjects(GTSExternalRead(app, @"GnomeFontScale"), @"1.25");
+  /* Invalid pending text: nothing applied, and a NEW Refused outcome. */
+  {
+    NSArray *pending = [NSArray arrayWithObject: [NSArray arrayWithObjects: [self fontRow: m], @"3", nil]];
+    BOOL ok = [m applyWithPendingTexts: pending];
+    XCTAssertFalse(ok);
+  }
+  second = [m lastApplyOutcome];
+  XCTAssertTrue(second != first, @"not the previous attempt's outcome");
+  XCTAssertEqual([second kind], GTSApplyOutcomeRefused);
+  XCTAssertEqual([[second error] code], (NSInteger)GTSErrorInvalidArgument);
+  XCTAssertTrue([[[second error] localizedDescription] rangeOfString: @"Text size"].location != NSNotFound,
+    @"%@", [[second error] localizedDescription]);
+  XCTAssertFalse([second didWrite]);
+  XCTAssertEqualObjects(GTSExternalRead(app, @"GnomeFontScale"), @"1.25");
+  /* The earlier object is unchanged (immutable). */
+  XCTAssertEqual([first kind], GTSApplyOutcomeSaved);
+}
+
 - (void) testStaleOutcomeClearedByEditCancelAndTargetSwitch
 {
   GTSEditorModel *m = [self modelWithStore: [[[GTSDefaultsDomainStore alloc] init] autorelease]];

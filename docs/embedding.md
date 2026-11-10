@@ -65,12 +65,18 @@ GTSThemeSettingsEditor *editor = [[GTSThemeSettingsEditor alloc] initWithModel: 
   object is immutable. It is cleared (`nil`) whenever it would be stale: a
   new edit is staged, Cancel, a successful Reload, or a target change. A
   failed Reload keeps it, because it still describes the state.
-* **Callbacks:**
-  - `themeSettingsEditor:didFinishApplyWithOutcome:` is called after every
-    Apply attempt.
-  - `themeSettingsEditorDidApply:` is still called only after a write
-    (`Saved` or `SavedRefreshFailed`).
-  - Both are optional.
+* **Callbacks:** both are optional.
+  - `themeSettingsEditorDidApply:` (legacy) means something was written
+    (`Saved` or `SavedRefreshFailed`). It does not prove that the settings
+    were re-read or applied live. It is called first.
+  - `themeSettingsEditor:didFinishApplyWithOutcome:` is then called for
+    EVERY attempt, including one refused before saving because the text
+    being typed was invalid (a fresh `Refused` outcome with
+    `GTSErrorInvalidArgument`). It is the authority for recovery.
+  - The outcome object is captured before either callback runs. A host that
+    edits or switches target inside a callback clears
+    `[model lastApplyOutcome]`, but not the object it was handed.
+  - Apply re-entered from a callback is ignored.
   - Example: `ThemeSettingsDemo/main.m` logs kind, write, reload-needed and
     requirement; a real app might offer "Restart now" when the requirement
     is restart.

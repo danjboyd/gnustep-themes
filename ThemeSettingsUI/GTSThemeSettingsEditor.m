@@ -45,7 +45,7 @@ wrappedHeight(NSString *text, float width, float size)
 - (NSView*) firstPopup;
 - (void) refreshButtons;
 - (NSArray*) editableFields;
-- (BOOL) stagePendingText;
+- (NSArray*) pendingTexts;
 @end
 
 @implementation GTSThemeSettingsEditor
@@ -277,19 +277,16 @@ fieldText(NSTextField *f)
 
 /* Stage what every free-form field shows. NO if any value is invalid
    (the model's message says why); nothing is staged for that field. */
-- (BOOL) stagePendingText
+/* (row, visible text) for every editable field, including text still in
+   the field editor. */
+- (NSArray*) pendingTexts
 {
+  NSMutableArray *a = [NSMutableArray array];
   NSEnumerator *e = [[self editableFields] objectEnumerator];
   NSTextField *f;
-  BOOL ok = YES;
   while ((f = [e nextObject]) != nil)
-    {
-      GTSSettingRow *row = [_rows objectAtIndex: [f tag]];
-      NSString *now = fieldText(f), *was = [row text] ? [row text] : @"";
-      if (![now isEqual: was] && ![_model setText: now forRow: row])
-        ok = NO;
-    }
-  return ok;
+    [a addObject: [NSArray arrayWithObjects: [_rows objectAtIndex: [f tag]], fieldText(f), nil]];
+  return a;
 }
 
 - (void) controlTextDidChange: (NSNotification*)n
@@ -431,23 +428,34 @@ fieldText(NSTextField *f)
 
 - (void) apply: (id)sender
 {
-  BOOL ok;
-  /* Commit whatever is being typed before saving: end editing, then stage
-     every field's visible text. An invalid entry stops the save. */
+  GTSApplyOutcome *o;
+  NSArray *pending;
+
+  /* A host calling back into Apply from a callback is ignored: one attempt
+     at a time, each with its own outcome. */
+  if (_applying) return;
+  _applying = YES;
+  /* End editing, then hand every field's visible text to the model, which
+     stages it or records a fresh Refused outcome (invalid text) and stops. */
+  pending = [self pendingTexts];
   [[_view window] makeFirstResponder: nil];
-  if (![self stagePendingText])
-    {
-      [self refreshButtons];
-      return;
-    }
-  ok = [_model apply];
+  [_model applyWithPendingTexts: pending];
+  /* Capture THIS attempt's outcome before any callback runs: a host that
+     edits or switches target inside one callback must not change what the
+     other receives. */
+  o = [[[_model lastApplyOutcome] retain] autorelease];
   [self reloadFromModel];
-  if (ok && _delegate != nil
-    && [_delegate respondsToSelector: @selector(themeSettingsEditorDidApply:)])
-    [_delegate themeSettingsEditorDidApply: self];
-  if (_delegate != nil && [_model lastApplyOutcome] != nil
-    && [_delegate respondsToSelector: @selector(themeSettingsEditor:didFinishApplyWithOutcome:)])
-    [_delegate themeSettingsEditor: self didFinishApplyWithOutcome: [_model lastApplyOutcome]];
+  if (_delegate != nil)
+    {
+      /* Legacy: "something was written" (Saved or SavedRefreshFailed). It is
+         NOT proof that reload or live application succeeded; the outcome is
+         the authority. */
+      if ([o didWrite] && [_delegate respondsToSelector: @selector(themeSettingsEditorDidApply:)])
+        [_delegate themeSettingsEditorDidApply: self];
+      if (o != nil && [_delegate respondsToSelector: @selector(themeSettingsEditor:didFinishApplyWithOutcome:)])
+        [_delegate themeSettingsEditor: self didFinishApplyWithOutcome: o];
+    }
+  _applying = NO;
 }
 
 - (void) cancel: (id)sender

@@ -8,11 +8,16 @@
 
 /* Both methods are optional (checked with respondsToSelector:). */
 @protocol GTSThemeSettingsEditorDelegate
-/* After a successful save (Saved or SavedRefreshFailed); kept for
-   existing hosts. */
+/* Legacy: after an attempt that WROTE (Saved or SavedRefreshFailed). This
+   is not proof that a reload or live application succeeded; for
+   SavedRefreshFailed the outcome callback (needsReload) is the authority.
+   Called before the outcome callback. */
 - (void) themeSettingsEditorDidApply: (GTSThemeSettingsEditor*)editor;
-/* After EVERY Apply attempt, with the structured outcome (the same object
-   as [[editor model] lastApplyOutcome]). Hosts decide from the outcome,
+/* After EVERY Apply attempt, including one refused before saving (invalid
+   text being typed), with that attempt's outcome. The object is captured
+   before any callback runs, so it never changes even if a callback edits
+   or switches target (which clears [model lastApplyOutcome]). Re-entrant
+   Apply from a callback is ignored. Hosts decide from the outcome,
    never from display text, and never re-apply on their own: the editor's
    Reload is the only recovery from WriteUnknown or SavedRefreshFailed. */
 - (void) themeSettingsEditor: (GTSThemeSettingsEditor*)editor
@@ -29,6 +34,7 @@
   NSButton *_apply, *_cancel, *_reload;
   NSArray *_rows;             /* GTSSettingRow, matches control tags */
   id _delegate;               /* not retained */
+  BOOL _applying;             /* re-entrancy guard for apply: */
 }
 - (id) initWithModel: (GTSEditorModel*)model;
 - (GTSEditorModel*) model;

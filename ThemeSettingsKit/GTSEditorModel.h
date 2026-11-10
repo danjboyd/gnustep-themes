@@ -143,6 +143,11 @@ typedef enum {
    stale: a new edit is staged, Cancel, a successful Reload, or a target
    change. -message is display text only; hosts use this instead. */
 - (GTSApplyOutcome*) lastApplyOutcome;
+/* Apply after staging text still being typed: pairs is an array of
+   (GTSSettingRow, NSString) two-element arrays. If any text is invalid,
+   nothing is applied and a FRESH Refused outcome (GTSErrorInvalidArgument,
+   naming the setting) is recorded, so every attempt has its own outcome. */
+- (BOOL) applyWithPendingTexts: (NSArray*)pairs;
 - (void) cancel;
 - (BOOL) reload;         /* pick up external edits, keep staged changes */
 - (NSString*) message;   /* last error/conflict/restart text, or nil */

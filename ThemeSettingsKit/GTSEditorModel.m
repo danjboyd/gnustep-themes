@@ -683,6 +683,31 @@ stateText(GTSResolvedValue *v, BOOL global)
   return NO;
 }
 
+- (BOOL) applyWithPendingTexts: (NSArray*)pairs
+{
+  NSEnumerator *e = [pairs objectEnumerator];
+  NSArray *pair;
+  while ((pair = [e nextObject]) != nil)
+    {
+      GTSSettingRow *row = [pair objectAtIndex: 0];
+      NSString *text = [pair objectAtIndex: 1];
+      NSString *was = [row text] ? [row text] : @"";
+      if ([text isEqual: was]) continue;
+      if (![self setText: text forRow: row])
+        {
+          NSString *why = [NSString stringWithFormat: @"%@: %@", [row title],
+            _message ? _message : @"invalid value"];
+          [self recordOutcome: GTSApplyOutcomeRefused receipt: nil
+            error: [NSError errorWithDomain: GTSErrorDomain code: GTSErrorInvalidArgument
+              userInfo: [NSDictionary dictionaryWithObject: why forKey: NSLocalizedDescriptionKey]]
+            conflicts: nil];
+          [self setMessage: [NSString stringWithFormat: @"Not saved: %@", why]];
+          return NO;
+        }
+    }
+  return [self apply];
+}
+
 - (void) cancel
 {
   [_session discardChanges];
