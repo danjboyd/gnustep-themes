@@ -3,7 +3,39 @@
    tested headless; the AppKit view just renders it. */
 #import <Foundation/Foundation.h>
 
-@class GTSAppImageSidecar;
+@class GTSAppImageSidecar, GTSApplyReceipt;
+
+typedef enum {
+  GTSApplyOutcomeSaved,               /* written and re-read */
+  GTSApplyOutcomeNothingToSave,       /* nothing was staged */
+  GTSApplyOutcomeSavedRefreshFailed,  /* written; re-read failed; reload before more edits */
+  GTSApplyOutcomeWriteUnknown,        /* may or may not be on disk; edits stay staged; reload */
+  GTSApplyOutcomeConflict,            /* not written: changed elsewhere (edits kept) */
+  GTSApplyOutcomeRefused              /* not written: read-only/unreadable/invalid/needs reload */
+} GTSApplyOutcomeKind;
+
+/* Immutable record of ONE Apply attempt, owned by the model. Hosts read
+   it; they never re-apply on its basis (the editor's Reload is the only
+   way out of WriteUnknown / SavedRefreshFailed). */
+@interface GTSApplyOutcome : NSObject
+{
+@public
+  GTSApplyOutcomeKind _kind;
+  GTSApplyReceipt *_receipt;
+  NSError *_error;
+  NSArray *_conflictKeys;
+  BOOL _needsReload;
+}
+- (GTSApplyOutcomeKind) kind;
+/* Saved / NothingToSave / SavedRefreshFailed only; carries the committed
+   changes and their strongest Apply requirement (GTSApplyPolicy). */
+- (GTSApplyReceipt*) receipt;
+- (NSError*) error;            /* failure kinds; nil otherwise */
+- (NSArray*) conflictKeys;     /* Conflict only */
+- (BOOL) didWrite;             /* YES for Saved and SavedRefreshFailed */
+- (BOOL) isOutcomeUnknown;     /* YES for WriteUnknown */
+- (BOOL) needsReload;          /* session refuses Apply until Reload */
+@end
 @class GTSDefaultsDomainStore, GTSDomainSnapshot, GTSThemeCatalog, GTSThemeRecord, GTSEditSession,
   GTSSettingDescriptor, GTSResolvedValue;
 
@@ -61,6 +93,7 @@
   NSString *_appImagePath;
   int _binding;                 /* GTSSidecarBinding */
   GTSDomainSnapshot *_roApp;    /* AppImage app domain, read only; nil = unknown */
+  GTSApplyOutcome *_lastOutcome;
 }
 - (id) initWithStore: (GTSDefaultsDomainStore*)store catalog: (GTSThemeCatalog*)catalog;
 
@@ -105,7 +138,11 @@
 /* Apply / Cancel */
 - (BOOL) hasChanges;
 - (BOOL) needsRestart;
-- (BOOL) apply;          /* NO: see -message; on conflict the model rebased */
+- (BOOL) apply;          /* NO: see -lastApplyOutcome; on conflict the model rebased */
+/* The outcome of the most recent Apply, or nil. Cleared when it would be
+   stale: a new edit is staged, Cancel, a successful Reload, or a target
+   change. -message is display text only; hosts use this instead. */
+- (GTSApplyOutcome*) lastApplyOutcome;
 - (void) cancel;
 - (BOOL) reload;         /* pick up external edits, keep staged changes */
 - (NSString*) message;   /* last error/conflict/restart text, or nil */

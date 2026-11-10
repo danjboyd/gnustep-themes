@@ -9,6 +9,8 @@
 #import "GTSThemeCatalog.h"
 #import "GTSScreenshot.h"
 #import "GTSScriptRunner.h"
+#import "GTSEditSession.h"
+#import "GTSThemeSettingsSchema.h"
 
 @interface GTSDemoHost : NSObject
 {
@@ -56,6 +58,7 @@
       [_model setHostDomain: [self hostDomain]];
       [self targetHost];
       _editor = [[GTSThemeSettingsEditor alloc] initWithModel: _model];
+      [_editor setDelegate: self];
 
       _pane = [[NSPanel alloc] initWithContentRect: r
         styleMask: NSTitledWindowMask | NSClosableWindowMask | NSResizableWindowMask
@@ -74,6 +77,21 @@
     }
   [_editor reloadFromModel];
   [_pane makeKeyAndOrderFront: self];
+}
+
+/* Structured outcome, not message text. The host's own reaction is
+   logged here; a real app might offer "Restart now" for restart-level
+   changes. It never re-applies. */
+- (void) themeSettingsEditor: (GTSThemeSettingsEditor*)editor
+     didFinishApplyWithOutcome: (GTSApplyOutcome*)o
+{
+  static const char *kinds[] = { "saved", "nothing-to-save", "saved-refresh-failed",
+    "write-unknown", "conflict", "refused" };
+  int req = [o receipt] ? [[o receipt] applyRequirement] : -1;
+  fprintf(stderr, "host: apply outcome=%s wrote=%d needsReload=%d requirement=%s\n",
+    kinds[[o kind]], [o didWrite], [o needsReload],
+    req == GTSApplyRestart ? "restart" : req == GTSApplyNewWindows ? "newWindows"
+      : req == GTSApplyLive ? "live" : "none");
 }
 
 - (void) scopeChanged: (id)sender

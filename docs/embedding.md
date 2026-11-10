@@ -46,13 +46,34 @@ GTSThemeSettingsEditor *editor = [[GTSThemeSettingsEditor alloc] initWithModel: 
   host must not hide that state.
 
 **Host callbacks and lifecycle receipts**
-* Today: `themeSettingsEditorDidApply:` fires only after a save succeeded.
-  The model's `message` gives the receipt text, and the session's
-  `GTSApplyReceipt` carries the strongest Apply requirement (restart,
-  newWindows or live) and `refreshFailed`.
-* **Gap to close before a SystemPreferences pane:** expose the last receipt
-  on the model (`-lastApplyReceipt`), so a host can decide for itself (for
-  example by offering "Restart now"). Hosts must not parse message text.
+* **Structured outcome:** `[model lastApplyOutcome]` returns a
+  `GTSApplyOutcome` for the most recent Apply attempt. Use it, not the
+  display `message`. Its `kind` is one of:
+  - `Saved`
+  - `NothingToSave`
+  - `SavedRefreshFailed`
+  - `WriteUnknown`
+  - `Conflict` (`conflictKeys` lists the keys)
+  - `Refused` (`error` says why: read-only, unreadable, invalid, or needs
+    reload)
+
+  `didWrite`, `isOutcomeUnknown` and `needsReload` are convenience flags.
+  For the saved kinds, `receipt` is the session's `GTSApplyReceipt`, giving
+  the committed changes and their strongest Apply requirement (restart,
+  newWindows or live).
+* **Who owns it and how long it lasts:** the model owns the outcome, and the
+  object is immutable. It is cleared (`nil`) whenever it would be stale: a
+  new edit is staged, Cancel, a successful Reload, or a target change. A
+  failed Reload keeps it, because it still describes the state.
+* **Callbacks:**
+  - `themeSettingsEditor:didFinishApplyWithOutcome:` is called after every
+    Apply attempt.
+  - `themeSettingsEditorDidApply:` is still called only after a write
+    (`Saved` or `SavedRefreshFailed`).
+  - Both are optional.
+  - Example: `ThemeSettingsDemo/main.m` logs kind, write, reload-needed and
+    requirement; a real app might offer "Restart now" when the requirement
+    is restart.
 * Two distinct post-Apply failure outcomes. The current API keeps them
   apart, and hosts must too:
   1. **Write outcome unknown:** `-applyWithConflicts:error:` returns nil
@@ -94,7 +115,7 @@ target.
   until then.
 
 **Prerequisites (each needs evidence first)**
-1. `-lastApplyReceipt` on the model (see above), with tests.
+1. Done: `-lastApplyOutcome` on the model, with tests (GTSApplyOutcomeTests).
 2. A packaged `libThemeSettingsUI` (headers plus library), so the pane does
    not compile our sources into itself; a build test against the installed
    library in a scratch prefix, never a global install.

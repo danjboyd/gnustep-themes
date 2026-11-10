@@ -445,6 +445,9 @@ fieldText(NSTextField *f)
   if (ok && _delegate != nil
     && [_delegate respondsToSelector: @selector(themeSettingsEditorDidApply:)])
     [_delegate themeSettingsEditorDidApply: self];
+  if (_delegate != nil && [_model lastApplyOutcome] != nil
+    && [_delegate respondsToSelector: @selector(themeSettingsEditor:didFinishApplyWithOutcome:)])
+    [_delegate themeSettingsEditor: self didFinishApplyWithOutcome: [_model lastApplyOutcome]];
 }
 
 - (void) cancel: (id)sender

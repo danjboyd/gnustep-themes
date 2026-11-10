@@ -4,10 +4,19 @@
    renders the model and forwards user actions to it. */
 #import <AppKit/AppKit.h>
 
-@class GTSEditorModel, GTSThemeSettingsEditor;
+@class GTSEditorModel, GTSThemeSettingsEditor, GTSApplyOutcome;
 
+/* Both methods are optional (checked with respondsToSelector:). */
 @protocol GTSThemeSettingsEditorDelegate
+/* After a successful save (Saved or SavedRefreshFailed); kept for
+   existing hosts. */
 - (void) themeSettingsEditorDidApply: (GTSThemeSettingsEditor*)editor;
+/* After EVERY Apply attempt, with the structured outcome (the same object
+   as [[editor model] lastApplyOutcome]). Hosts decide from the outcome,
+   never from display text, and never re-apply on their own: the editor's
+   Reload is the only recovery from WriteUnknown or SavedRefreshFailed. */
+- (void) themeSettingsEditor: (GTSThemeSettingsEditor*)editor
+     didFinishApplyWithOutcome: (GTSApplyOutcome*)outcome;
 @end
 
 @interface GTSThemeSettingsEditor : NSObject <NSTextFieldDelegate>

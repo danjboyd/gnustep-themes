@@ -52,7 +52,37 @@
 }
 @end
 
+@implementation GTSApplyOutcome
+- (void) dealloc
+{
+  [_receipt release]; [_error release]; [_conflictKeys release];
+  [super dealloc];
+}
+- (GTSApplyOutcomeKind) kind { return _kind; }
+- (GTSApplyReceipt*) receipt { return _receipt; }
+- (NSError*) error { return _error; }
+- (NSArray*) conflictKeys { return _conflictKeys; }
+- (BOOL) didWrite { return _kind == GTSApplyOutcomeSaved || _kind == GTSApplyOutcomeSavedRefreshFailed; }
+- (BOOL) isOutcomeUnknown { return _kind == GTSApplyOutcomeWriteUnknown; }
+- (BOOL) needsReload { return _needsReload; }
+@end
+
 @implementation GTSEditorModel
+
+- (void) recordOutcome: (GTSApplyOutcomeKind)kind receipt: (GTSApplyReceipt*)r
+                 error: (NSError*)e conflicts: (NSArray*)c
+{
+  GTSApplyOutcome *o = [[[GTSApplyOutcome alloc] init] autorelease];
+  o->_kind = kind;
+  o->_receipt = [r retain];
+  o->_error = [e retain];
+  o->_conflictKeys = [[c valueForKey: @"key"] copy];
+  o->_needsReload = [_session needsRebase];
+  ASSIGN(_lastOutcome, o);
+}
+
+- (void) clearOutcome { DESTROY(_lastOutcome); }
+- (GTSApplyOutcome*) lastApplyOutcome { return _lastOutcome; }
 
 - (id) initWithStore: (GTSDefaultsDomainStore*)store catalog: (GTSThemeCatalog*)catalog
 {
@@ -69,7 +99,7 @@
 {
   [_store release]; [_catalog release]; [_appDomain release]; [_appName release];
   [_appInfo release]; [_session release]; [_globalBaseline release]; [_message release];
-  [_hostDomain release]; [_sidecar release]; [_appImagePath release]; [_roApp release];
+  [_hostDomain release]; [_lastOutcome release]; [_sidecar release]; [_appImagePath release]; [_roApp release];
   [super dealloc];
 }
 
@@ -78,6 +108,7 @@
 
 - (BOOL) openSessionForDomain: (NSString*)domain
 {
+  [self clearOutcome];
   NSError *err = nil;
   GTSEditSession *s = [[[GTSEditSession alloc] initWithStore: _store domain: domain error: &err] autorelease];
   ASSIGN(_session, s);
@@ -124,6 +155,7 @@
 {
   NSString *domain;
   NSError *err = nil;
+  [self clearOutcome];
   DESTROY(_session); DESTROY(_roApp); DESTROY(_appInfo); DESTROY(_globalBaseline);
   ASSIGN(_sidecar, sidecar);
   ASSIGN(_appImagePath, appImagePath);
@@ -387,6 +419,7 @@ stateText(GTSResolvedValue *v, BOOL global)
 - (void) selectThemeChoiceAtIndex: (NSInteger)index
 {
   if (_sidecar != nil) return;   /* read-only */
+  [self clearOutcome];             /* a new edit makes the last outcome stale */
   NSArray *c = [self themeChoices];
   if (index < 0 || (NSUInteger)index >= [c count]) return;
   [_session stageThemeSelection: [[c objectAtIndex: index] value]];
@@ -517,6 +550,7 @@ stateText(GTSResolvedValue *v, BOOL global)
   id value;
   NSString *problem = nil;
   if ([self refuseReadOnly: row]) return NO;
+  [self clearOutcome];
   if (index < 0 || (NSUInteger)index >= [[row choices] count]) return NO;
   value = [[[row choices] objectAtIndex: index] value];
   if (value == nil)
@@ -536,6 +570,7 @@ stateText(GTSResolvedValue *v, BOOL global)
 {
   NSString *problem = nil;
   if ([self refuseReadOnly: row]) return NO;
+  [self clearOutcome];
   if ([text length] == 0)
     {
       [_session stageResetForSetting: [row setting]];
@@ -552,6 +587,7 @@ stateText(GTSResolvedValue *v, BOOL global)
 - (void) resetRow: (GTSSettingRow*)row
 {
   if ([self refuseReadOnly: row]) return;
+  [self clearOutcome];
   [_session stageResetForSetting: [row setting]];
 }
 
@@ -572,11 +608,21 @@ stateText(GTSResolvedValue *v, BOOL global)
   GTSApplyReceipt *r;
   int req;
 
-  if (_session == nil) return NO;
+  if (_session == nil)
+    {
+      [self recordOutcome: GTSApplyOutcomeRefused receipt: nil
+        error: [NSError errorWithDomain: GTSErrorDomain code: GTSErrorUnreadableDomain
+          userInfo: [NSDictionary dictionaryWithObject: @"this target cannot be changed here"
+            forKey: NSLocalizedDescriptionKey]] conflicts: nil];
+      return NO;
+    }
   r = [_session applyWithConflicts: &conflicts error: &err];
   if (r != nil)
     {
       NSString *m;
+      [self recordOutcome: ([[r committedChanges] count] == 0 ? GTSApplyOutcomeNothingToSave
+          : ([r refreshFailed] ? GTSApplyOutcomeSavedRefreshFailed : GTSApplyOutcomeSaved))
+        receipt: r error: [r refreshError] conflicts: nil];
       req = [r applyRequirement];
       if ([[r committedChanges] count] == 0)
         m = @"Nothing to save.";
@@ -605,6 +651,7 @@ stateText(GTSResolvedValue *v, BOOL global)
   if ([conflicts count] > 0)
     {
       NSError *rebaseErr = nil;
+      [self recordOutcome: GTSApplyOutcomeConflict receipt: nil error: err conflicts: conflicts];
       if ([_session rebaseWithError: &rebaseErr] != nil)
         [self setMessage: [NSString stringWithFormat:
           @"Not saved: %@ changed elsewhere since you opened this. The current values are now shown "
@@ -617,33 +664,48 @@ stateText(GTSResolvedValue *v, BOOL global)
           [rebaseErr localizedDescription]]];
     }
   else if ([err code] == GTSErrorWriteFailed)
-    [self setMessage: [NSString stringWithFormat:
-      @"The save may not have completed (%@). Reload to see what is stored now; "
-      @"your changes stay listed until they are confirmed.", [err localizedDescription]]];
+    {
+      [self recordOutcome: GTSApplyOutcomeWriteUnknown receipt: nil error: err conflicts: nil];
+      [self setMessage: [NSString stringWithFormat:
+        @"The save may not have completed (%@). Reload to see what is stored now; "
+        @"your changes stay listed until they are confirmed.", [err localizedDescription]]];
+    }
   else if ([err code] == GTSErrorNeedsReload)
-    [self setMessage: @"Reload first: the result of the previous save has not been confirmed."];
+    {
+      [self recordOutcome: GTSApplyOutcomeRefused receipt: nil error: err conflicts: nil];
+      [self setMessage: @"Reload first: the result of the previous save has not been confirmed."];
+    }
   else
-    [self setMessage: [NSString stringWithFormat: @"Not saved: %@", [err localizedDescription]]];
+    {
+      [self recordOutcome: GTSApplyOutcomeRefused receipt: nil error: err conflicts: nil];
+      [self setMessage: [NSString stringWithFormat: @"Not saved: %@", [err localizedDescription]]];
+    }
   return NO;
 }
 
 - (void) cancel
 {
   [_session discardChanges];
+  [self clearOutcome];
   [self setMessage: nil];
 }
 
 - (BOOL) reload
 {
   NSError *err = nil;
+  if (_sidecar != nil)   /* stay on the AppImage target (read-only) */
+    return [self setTargetAppImageSidecar: [[_sidecar retain] autorelease]
+                                  appImage: [[_appImagePath retain] autorelease]];
   if (_session == nil)
     return [self targetIsGlobal] ? [self setTargetGlobal]
       : [self setTargetApplicationDomain: _appDomain displayName: _appName info: _appInfo];
   if ([_session rebaseWithError: &err] == nil)
     {
+      /* The previous outcome still describes the state: keep it. */
       [self setMessage: [NSString stringWithFormat: @"Could not reload: %@", [err localizedDescription]]];
       return NO;
     }
+  [self clearOutcome];
   if (![self targetIsGlobal])
     {
       GTSDomainSnapshot *g = [_store snapshotForDomain: NSGlobalDomain error: &err];
