@@ -1,10 +1,12 @@
 /* GTSDefaultsDomainStore.m */
 #import "GTSDefaultsDomainStore.h"
 #import "GTSThemeSettingsSchema.h"
-#include <unistd.h>
 #include <errno.h>
 #include <string.h>
+#if !defined(_WIN32)
+#include <unistd.h>
 #include <sys/stat.h>
+#endif
 
 static NSError *
 storeError(NSInteger code, NSString *fmt, ...)
@@ -158,6 +160,10 @@ isPropertyList(id v, int depth)
 {
   return [name isKindOfClass: [NSString class]] && [name length] > 0
     && [name rangeOfString: @"/"].location == NSNotFound
+    && [name rangeOfString: @"\\"].location == NSNotFound   /* a separator on Windows */
+#if defined(_WIN32)
+    && [name rangeOfString: @":"].location == NSNotFound      /* drive letters, streams */
+#endif
     && ![name hasPrefix: @"."];
 }
 
@@ -173,6 +179,28 @@ isPropertyList(id v, int depth)
 /* lstat-based classification. Only ENOENT counts as "absent"; any other
    error, a dangling symlink, or an unexpected file type is an error. */
 typedef enum { GTSPathAbsent, GTSPathFile, GTSPathDirectory, GTSPathError } GTSPathKind;
+
+#if defined(_WIN32)
+/* Never reached: isBackendSupported is NO here, and checkBackendForDomain
+   returns before classifying anything. Kept so the Kit compiles with MinGW
+   (no lstat/S_ISLNK, and _access rejects X_OK). Fails closed if ever used. */
+static GTSPathKind
+classifyPath(NSString *path, NSString **why)
+{
+  if (why) *why = [NSString stringWithFormat: @"%@: not checked on this platform", path];
+  return GTSPathError;
+}
+static BOOL
+canRead(NSString *path, BOOL isDirectory)
+{
+  return NO;
+}
+#else
+static BOOL
+canRead(NSString *path, BOOL isDirectory)
+{
+  return access([path fileSystemRepresentation], isDirectory ? (R_OK | X_OK) : R_OK) == 0;
+}
 
 static GTSPathKind
 classifyPath(NSString *path, NSString **why)
@@ -196,6 +224,7 @@ classifyPath(NSString *path, NSString **why)
   if (why) *why = [NSString stringWithFormat: @"%@ is not a regular file or directory", path];
   return GTSPathError;
 }
+#endif
 
 - (NSUserDefaults*) newDefaultsInstance
 {
@@ -232,7 +261,7 @@ classifyPath(NSString *path, NSString **why)
       case GTSPathAbsent:
         return YES;                      /* confirmed: nothing stored yet */
       case GTSPathDirectory:
-        if (access([root fileSystemRepresentation], R_OK | X_OK) == 0) break;
+        if (canRead(root, YES)) break;
         why = [NSString stringWithFormat: @"%@ is not readable", root];
         /* fall through */
       default:
@@ -248,7 +277,7 @@ classifyPath(NSString *path, NSString **why)
       case GTSPathAbsent:
         return YES;                      /* confirmed: absent domain */
       case GTSPathFile:
-        if (access([file fileSystemRepresentation], R_OK) == 0) break;
+        if (canRead(file, NO)) break;
         why = [NSString stringWithFormat: @"%@ is not readable", file];
         /* fall through */
       default:

@@ -230,4 +230,13 @@
   XCTAssertFalse([[GTSDefaultsDomainStore applicationIdentityForBundleAtPath: c] isEstablished],
     @"a name guessed from the path is not an established domain");
 }
+- (void) testDomainNamesNeverContainPathSeparators
+{
+  XCTAssertTrue([GTSDefaultsDomainStore isValidDomainName: @"org.example.Writer"]);
+  XCTAssertTrue([GTSDefaultsDomainStore isValidDomainName: @"NSGlobalDomain"]);
+  XCTAssertFalse([GTSDefaultsDomainStore isValidDomainName: @"a/b"]);
+  XCTAssertFalse([GTSDefaultsDomainStore isValidDomainName: @"..\\outside"], @"backslash is a separator on Windows");
+  XCTAssertFalse([GTSDefaultsDomainStore isValidDomainName: @".hidden"]);
+  XCTAssertFalse([GTSDefaultsDomainStore isValidDomainName: @""]);
+}
 @end

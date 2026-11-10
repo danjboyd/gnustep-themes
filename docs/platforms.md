@@ -57,6 +57,10 @@ Nothing in this document enables editing anywhere it is not already enabled.
 
 ## Windows (MSYS2): requirements before enabling
 
+Static audit and a build recipe: docs/windows.md (2026-11-10). The Kit now
+compiles its POSIX-only store checks only off Windows, and domain names may
+not contain `\` (or `:` on Windows). Both are untested on Windows.
+
 1. Find out which defaults backend the target gnustep-base build uses:
    the registry, or files under the user's GNUstep defaults directory. Do this
    from source and from a sandboxed test on a Windows runner.
