@@ -58,7 +58,7 @@
   XCTAssertEqual([row selectedIndex], (NSInteger)0, @"no override stored");
   XCTAssertFalse([row canReset]);
   XCTAssertEqualObjects([row stateText], @"From the application's Info.plist");
-  XCTAssertEqualObjects([[[row choices] objectAtIndex: 0] title], @"Application default (Menu bar)");
+  XCTAssertEqualObjects([[[row choices] objectAtIndex: 0] title], @"Application default (In-window menu bar)");
   XCTAssertTrue([[row note] rangeOfString: @"restarts"].location != NSNotFound);
 }
 
@@ -150,7 +150,7 @@
   XCTAssertEqualObjects([model themeStateText], @"Set for all applications");
   XCTAssertEqualObjects([[[model themeChoices] objectAtIndex: 0] title], @"GNUstep (default)");
   XCTAssertTrue([[[[[self rowNamed: @"gumdrop.menu-style"] choices] objectAtIndex: 0] title]
-    hasPrefix: @"Default (In window"], @"no app Info.plist when editing global");
+    hasPrefix: @"Default (Title-bar menu button"], @"no app Info.plist when editing global");
 }
 
 - (void) testApplyRequirementIsStrongestStaged

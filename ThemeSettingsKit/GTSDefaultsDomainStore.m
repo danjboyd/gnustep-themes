@@ -2,6 +2,9 @@
 #import "GTSDefaultsDomainStore.h"
 #import "GTSThemeSettingsSchema.h"
 #include <unistd.h>
+#include <errno.h>
+#include <string.h>
+#include <sys/stat.h>
 
 static NSError *
 storeError(NSInteger code, NSString *fmt, ...)
@@ -158,6 +161,42 @@ isPropertyList(id v, int depth)
     && ![name hasPrefix: @"."];
 }
 
++ (BOOL) isBackendSupported
+{
+#if defined(_WIN32) || defined(__MINGW32__) || defined(__CYGWIN__)
+  return NO;   /* base may use the registry here; not verified */
+#else
+  return YES;
+#endif
+}
+
+/* lstat-based classification. Only ENOENT counts as "absent"; any other
+   error, a dangling symlink, or an unexpected file type is an error. */
+typedef enum { GTSPathAbsent, GTSPathFile, GTSPathDirectory, GTSPathError } GTSPathKind;
+
+static GTSPathKind
+classifyPath(NSString *path, NSString **why)
+{
+  struct stat ls, st;
+  const char *p = [path fileSystemRepresentation];
+  if (lstat(p, &ls) != 0)
+    {
+      if (errno == ENOENT) return GTSPathAbsent;
+      if (why) *why = [NSString stringWithFormat: @"%@: %s", path, strerror(errno)];
+      return GTSPathError;
+    }
+  if (stat(p, &st) != 0)
+    {
+      if (why) *why = [NSString stringWithFormat: @"%@: %s (%s)", path, strerror(errno),
+        S_ISLNK(ls.st_mode) ? "dangling symlink" : "stat failed"];
+      return GTSPathError;
+    }
+  if (S_ISDIR(st.st_mode)) return GTSPathDirectory;
+  if (S_ISREG(st.st_mode)) return GTSPathFile;
+  if (why) *why = [NSString stringWithFormat: @"%@ is not a regular file or directory", path];
+  return GTSPathError;
+}
+
 - (NSUserDefaults*) newDefaultsInstance
 {
   return [[NSUserDefaults alloc] initWithUser: NSUserName()];
@@ -171,29 +210,50 @@ isPropertyList(id v, int depth)
                     fileValues: (NSDictionary**)fileValues
                          error: (NSError**)error
 {
-  NSFileManager *fm = [NSFileManager defaultManager];
   NSString *root = [[self class] defaultsRoot];
-  NSString *file = [root stringByAppendingPathComponent:
-    [domainName stringByAppendingPathExtension: @"plist"]];
-  BOOL isDir = NO;
+  NSString *file, *why = nil;
   id parsed;
 
   *fileValues = nil;
-  if (![fm fileExistsAtPath: root isDirectory: &isDir])
-    return YES;                          /* fresh user: nothing stored yet */
-  if (!isDir || access([root fileSystemRepresentation], R_OK | X_OK) != 0)
+  if (![[self class] isBackendSupported])
     {
-      if (error) *error = storeError(GTSErrorUnreadableDomain,
-        @"defaults directory %@ is not readable", root);
+      if (error) *error = storeError(GTSErrorUnsupportedBackend,
+        @"this defaults backend is not supported for editing yet");
       return NO;
     }
-  if (![fm fileExistsAtPath: file])
-    return YES;                          /* absent domain */
-  if (access([file fileSystemRepresentation], R_OK) != 0)
+  if (![root isKindOfClass: [NSString class]] || ![root isAbsolutePath])
     {
-      if (error) *error = storeError(GTSErrorUnreadableDomain,
-        @"defaults for %@ exist but cannot be read (%@)", domainName, file);
+      if (error) *error = storeError(GTSErrorUnsupportedBackend,
+        @"defaults root %@ is not an absolute path", root);
       return NO;
+    }
+  switch (classifyPath(root, &why))
+    {
+      case GTSPathAbsent:
+        return YES;                      /* confirmed: nothing stored yet */
+      case GTSPathDirectory:
+        if (access([root fileSystemRepresentation], R_OK | X_OK) == 0) break;
+        why = [NSString stringWithFormat: @"%@ is not readable", root];
+        /* fall through */
+      default:
+        if (error) *error = storeError(GTSErrorUnreadableDomain,
+          @"defaults directory cannot be used: %@", why);
+        return NO;
+    }
+  file = [root stringByAppendingPathComponent:
+    [domainName stringByAppendingPathExtension: @"plist"]];
+  switch (classifyPath(file, &why))
+    {
+      case GTSPathAbsent:
+        return YES;                      /* confirmed: absent domain */
+      case GTSPathFile:
+        if (access([file fileSystemRepresentation], R_OK) == 0) break;
+        why = [NSString stringWithFormat: @"%@ is not readable", file];
+        /* fall through */
+      default:
+        if (error) *error = storeError(GTSErrorUnreadableDomain,
+          @"defaults for %@ exist but cannot be read: %@", domainName, why);
+        return NO;
     }
   parsed = nil;
   NS_DURING
@@ -225,6 +285,7 @@ isPropertyList(id v, int depth)
 {
   NSUserDefaults *d;
   NSDictionary *apiValues, *fileValues = nil;
+  GTSDomainSnapshot *snap;
 
   if (outDefaults) *outDefaults = nil;
   if (![[self class] isValidDomainName: domainName])
@@ -258,8 +319,11 @@ isPropertyList(id v, int depth)
         @"defaults for %@ could not be loaded consistently", domainName);
       return nil;
     }
+  /* Build (copy) the snapshot while d is alive. gnustep-base returns a copy
+     here (gnustep owner, msg 20394), but this does not depend on it. */
+  snap = [[[GTSDomainSnapshot alloc] initWithDomainName: domainName values: apiValues] autorelease];
   if (outDefaults) *outDefaults = d; else [d release];
-  return [[[GTSDomainSnapshot alloc] initWithDomainName: domainName values: apiValues] autorelease];
+  return snap;
 }
 
 - (GTSDomainSnapshot*) snapshotForDomain: (NSString*)domainName error: (NSError**)error

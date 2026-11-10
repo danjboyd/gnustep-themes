@@ -1,7 +1,9 @@
 /* Gumdrop (fun-themes) - DRAFT for the fun-themes owner's review.
    Semantics from owner msgs #20599/#20861 at b3a960d, Source/GumdropMenus.m:65-76,
    GumdropWindow.m:201,522-576. An Info.plist value other than "menubar" ends as
-   primary, so only "menubar" is listed as winning from Info.plist. */
+   primary, so only "menubar" is listed as winning from Info.plist.
+   ThemeIdentifier is a proposed descriptor identity; Gumdrop's Info.plist
+   does not declare it. Labels per owner review #20946. */
 {
   SchemaVersion = 1;
   Theme = Gumdrop;
@@ -14,8 +16,8 @@
       Type = enum;
       CaseInsensitive = YES;
       Values = (
-        { Value = primary; Title = "In window (primary)"; },
-        { Value = menubar; Title = "Menu bar"; }
+        { Value = primary; Title = "Title-bar menu button"; },
+        { Value = menubar; Title = "In-window menu bar"; }
       );
       Scopes = ( global, application );
       Group = menus;

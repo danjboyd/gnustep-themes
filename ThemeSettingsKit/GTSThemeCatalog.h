@@ -48,13 +48,14 @@ extern NSString * const GTSDefaultThemeName;
 /* Three separate identities; none is derived from another.
    themeIdentifier: logical theme (ThemeSettings.plist), may be nil.
    bundleIdentifier/bundleVersion: package identity from the bundle's Info.
-   fingerprint: this installed artifact (path-independent digest of Info,
-   ThemeSettings.plist and executable), distinguishes copies/forks that
-   share the other two. */
+   descriptorFingerprint: digest of this copy's Info plist, ThemeSettings.plist
+   and executable. It tells copies/forks apart that share the other two; it
+   is NOT a full artifact integrity check (other resources are not covered).
+   Location is the separate -path. */
 - (NSString*) themeIdentifier;
 - (NSString*) bundleIdentifier;
 - (NSString*) bundleVersion;
-- (NSString*) fingerprint;
+- (NSString*) descriptorFingerprint;
 - (GTSThemeSettingsSchema*) schema; /* nil: no or invalid metadata */
 - (NSError*) schemaError;           /* why schema is nil, if it had a file */
 - (NSArray*) shadowedRecords;       /* lower-priority same-name copies */

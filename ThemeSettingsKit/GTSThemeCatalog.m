@@ -90,7 +90,7 @@ stringOrNil(id o)
   return v ? v : stringOrNil([_info objectForKey: @"CFBundleShortVersionString"]);
 }
 
-- (NSString*) fingerprint
+- (NSString*) descriptorFingerprint
 {
   NSMutableData *all;
   NSEnumerator *e;

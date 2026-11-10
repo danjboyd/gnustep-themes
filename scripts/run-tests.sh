@@ -4,6 +4,12 @@
 # before any test runs, this script and the tests both verify (read-only)
 # that this runtime + config resolve the defaults root inside the scratch
 # root, for the test process AND for child tools.
+#
+# Process ownership: xctest runs under setsid, so it and everything it
+# spawns share a session id equal to its pid. A process is ours only if it
+# is in that session AND its environment carries GTS_TEST_ROOT=<this root>.
+# Only verified processes are signalled, individually; no group or
+# name-based kill is used.
 set -eu
 here=$(cd "$(dirname "$0")/.." && pwd)
 fail() { echo "run-tests: $*" >&2; exit 1; }
@@ -14,23 +20,58 @@ base=${GTS_SCRATCH:-${TMPDIR:-/tmp}}
 root=$(mktemp -d "$base/gts-test.XXXXXX") || fail "cannot create scratch root"
 chmod 700 "$root"
 root=$(cd "$root" && pwd -P)
-child=""
+sid=""
+grace=${GTS_STOP_GRACE:-5}
 
-cleanup() {
+# PIDs in our session whose environment proves they belong to this run.
+owned_pids() {
+  [ -n "$sid" ] || return 0
+  ps -eo pid=,sid= | while read -r p s; do
+    [ "$s" = "$sid" ] || continue
+    if { tr "\0" "\n" < "/proc/$p/environ"; } 2>/dev/null | grep -qx "GTS_TEST_ROOT=$root"; then
+      echo "$p"
+    elif [ -e "/proc/$p" ]; then
+      echo "run-tests: process $p in session $sid could not be verified; not signalled" >&2
+    fi
+  done
+}
+
+wait_gone() {   # seconds
+  n=$(( $1 * 10 ))
+  while [ "$n" -gt 0 ]; do
+    [ -z "$(owned_pids)" ] && return 0
+    sleep 0.1; n=$((n - 1))
+  done
+  [ -z "$(owned_pids)" ]
+}
+
+stop_owned() {
+  pids=$(owned_pids)
+  [ -n "$pids" ] || return 0
+  kill -TERM $pids 2>/dev/null || true
+  wait_gone "$grace" && return 0
+  pids=$(owned_pids)
+  [ -n "$pids" ] && kill -KILL $pids 2>/dev/null || true
+  wait_gone 2 && return 0
+  echo "run-tests: residual processes after KILL: $(owned_pids | tr '\n' ' ')" >&2
+  return 1
+}
+
+finish() {
   status=$1
-  if [ -n "$child" ]; then
-    # xctest runs in its own process group (setsid): stop it and every
-    # defaults tool it spawned before their scratch config disappears.
-    kill -TERM -- "-$child" 2>/dev/null || true
-    wait "$child" 2>/dev/null || true
-    kill -KILL -- "-$child" 2>/dev/null || true
+  trap '' INT TERM
+  trap - EXIT
+  stop_owned || status=${status:-1}
+  [ -n "$sid" ] && wait "$sid" 2>/dev/null || true   # reap the leader
+  if ! rm -rf "$root"; then
+    echo "run-tests: could not remove $root" >&2
+    [ "$status" -ne 0 ] || status=1
   fi
-  rm -rf "$root"
   exit "$status"
 }
-trap 'cleanup $?' EXIT
-trap 'trap - EXIT; cleanup 130' INT
-trap 'trap - EXIT; cleanup 143' TERM
+trap 'finish $?' EXIT
+trap 'finish 130' INT
+trap 'finish 143' TERM
 
 sysconf=${GTS_SYSTEM_CONF:-/etc/GNUstep/GNUstep.conf}
 [ -r "$sysconf" ] || fail "master config $sysconf is not readable"
@@ -51,13 +92,14 @@ export GTS_TEST_ROOT="$root"
 export GTS_EXAMPLES="$here/examples"
 export LD_LIBRARY_PATH="$HOME/GNUstep/Library/Libraries${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
+# Build first (building writes no defaults), then verify, then run.
 make -s -C "$here/Tests/RootProbe" messages=no >/dev/null || fail "root probe build failed"
+make -s -C "$here/Tests" messages=no >/dev/null || fail "test build failed"
 probe="$here/Tests/RootProbe/obj/gts-root-probe"
-export GTS_ROOT_PROBE="$probe"
 defaults_tool=${GTS_DEFAULTS_TOOL:-/usr/bin/defaults}
 
 # Same gnustep-base for the probe and the defaults tool, or the probe proves
-# nothing about the tool.
+# nothing about the tool. Only the verified tool path is handed to the tests.
 lib_of() { ldd "$1" | awk '/libgnustep-base/ { print $3 }'; }
 plib=$(lib_of "$probe"); dlib=$(lib_of "$defaults_tool")
 [ -n "$plib" ] && [ "$plib" = "$dlib" ] || fail "probe ($plib) and defaults tool ($dlib) use different gnustep-base"
@@ -68,13 +110,16 @@ case "$resolved" in
   *) fail "defaults root $resolved is not inside $root; refusing to run" ;;
 esac
 echo "run-tests: defaults root $resolved (isolated; base $plib)"
+export GTS_ROOT_PROBE="$probe"
+export GTS_VERIFIED_DEFAULTS_TOOL="$defaults_tool"
+unset GTS_DEFAULTS_TOOL
 
-make -s -C "$here/Tests" messages=no >/dev/null || fail "test build failed"
 xctest=${XCTEST:-$HOME/GNUstep/Tools/xctest}
 command -v setsid >/dev/null || fail "setsid is required to contain test child processes"
 setsid "$xctest" "$here/Tests/ThemeSettingsKitTests.bundle" "$@" &
-child=$!
-wait "$child"
-st=$?
-child=""
-exit "$st"
+sid=$!
+st=0
+wait "$sid" || st=$?
+# The leader is done; descendants it left behind are still ours to stop
+# (finish does that), keyed on the session and our marker, not on the leader.
+finish "$st"

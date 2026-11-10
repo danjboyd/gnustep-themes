@@ -22,7 +22,9 @@ enum {
   GTSErrorUnsafeDefaultsRoot = 12,
   GTSErrorUnreadableDomain = 13,
   GTSErrorInvalidArgument = 14,
-  GTSErrorUnsupportedFeature = 15
+  GTSErrorUnsupportedFeature = 15,
+  GTSErrorUnsupportedBackend = 16,  /* defaults backend this store can't verify */
+  GTSErrorNeedsReload = 17          /* outcome of an earlier write unknown; reload first */
 };
 
 typedef enum {

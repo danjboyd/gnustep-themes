@@ -180,9 +180,10 @@ applyChanges(NSDictionary *base, NSDictionary *changes)
   if (conflicts) *conflicts = nil;
   if (_needsRebase)
     {
-      if (error) *error = [NSError errorWithDomain: GTSErrorDomain code: GTSErrorUnreadableDomain
+      if (error) *error = [NSError errorWithDomain: GTSErrorDomain code: GTSErrorNeedsReload
         userInfo: [NSDictionary dictionaryWithObject:
-          @"settings must be reloaded before saving again" forKey: NSLocalizedDescriptionKey]];
+          @"the result of an earlier save is unknown or unconfirmed; reload before saving again"
+          forKey: NSLocalizedDescriptionKey]];
       return nil;
     }
   committed = [[_staged copy] autorelease];
@@ -191,9 +192,21 @@ applyChanges(NSDictionary *base, NSDictionary *changes)
   r->_requirement = [self requirementForKeys: [committed allKeys]];
   if ([committed count] == 0)
     return r;
-  if (![_store commitChanges: committed toDomain: _domain baseline: _baseline
-                   conflicts: conflicts error: error])
-    return nil;
+  {
+    NSError *commitErr = nil;   /* captured even when the caller passes NULL */
+    if (![_store commitChanges: committed toDomain: _domain baseline: _baseline
+                     conflicts: conflicts error: &commitErr])
+      {
+        /* A failed -synchronize may or may not have written. Keep the
+           intended edits staged, but refuse further applies until a rebase
+           shows what is really on disk (rebase drops staged keys that are
+           already there, so nothing is blindly written twice). */
+        if ([commitErr code] == GTSErrorWriteFailed)
+          _needsRebase = YES;
+        if (error) *error = commitErr;
+        return nil;
+      }
+  }
 
   [_staged removeAllObjects];
   fresh = [_store snapshotForDomain: _domain error: &refreshErr];

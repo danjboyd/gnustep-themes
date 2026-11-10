@@ -58,6 +58,25 @@ with finding 1: `GNUSTEP_CONFIG_FILE` is read from the environment;
 parser rejects group/other-writable files. The actual resolved-root assertion
 remains the safety criterion.
 
+## Harness lifecycle (self-test: scripts/test-runner.sh)
+
+* xctest runs under `setsid`; a process is the runner's only if it is in that
+  session AND its environment has `GTS_TEST_ROOT=<this root>`. Only such
+  verified PIDs are signalled, individually: TERM, a bounded grace period
+  (`GTS_STOP_GRACE`, default 5 s), then KILL, then a final check that reports
+  residuals. This also runs after a normal leader exit, so descendants that
+  outlive xctest are stopped before the scratch config is deleted.
+* Self-test (disposable fake leaders): a lingering descendant after exit 7
+  gives status 7, nothing left, root removed; a TERM-resistant leader and
+  child with the runner TERMed exit 143 within ~3 s, nothing left.
+* In-process guard abort in a disposable subprocess (defaults root outside
+  GTS_TEST_ROOT): exit 134 with "REFUSING TO RUN", and no defaults data.
+  Finding: gnustep-base in the xctest host created its lock directory
+  `<root>/.lck` during startup, before any test code (and so before the
+  guard) could run. The in-process guard therefore cannot prevent that
+  side effect; the runner's preflight, which verifies the root before
+  xctest starts, is the gate that does.
+
 ## Limits
 
 * The in-app pane's own `standardUserDefaults` may serve stale values for

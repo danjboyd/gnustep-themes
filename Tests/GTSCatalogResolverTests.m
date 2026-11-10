@@ -106,7 +106,7 @@ resolve(GTSSettingDescriptor *s, NSDictionary *global, NSDictionary *app, NSDict
     XCTAssertEqualObjects([sh bundleVersion], @"bundled");
     XCTAssertEqualObjects([sh origin], GTSOriginSystem);
     XCTAssertEqualObjects([sh themeIdentifier], [a themeIdentifier], @"same logical theme ...");
-    XCTAssertFalse([[a fingerprint] isEqual: [sh fingerprint]], @"... but distinct installed artifacts");
+    XCTAssertFalse([[a descriptorFingerprint] isEqual: [sh descriptorFingerprint]], @"... but distinct installed artifacts");
   }
   XCTAssertEqualObjects([[c themes] valueForKey: @"name"], ([NSArray arrayWithObjects:
     @"Adwaita", @"Broken", @"Gumdrop", @"NoMeta", nil]));
@@ -121,7 +121,7 @@ resolve(GTSSettingDescriptor *s, NSDictionary *global, NSDictionary *app, NSDict
   XCTAssertNil([n schemaError], @"no file is not an error");
   XCTAssertEqualObjects([n bundleIdentifier], @"org.example.theme.NoMeta");
   XCTAssertNil([n themeIdentifier], @"no logical id is invented from the bundle id");
-  XCTAssertNotNil([n fingerprint]);
+  XCTAssertNotNil([n descriptorFingerprint]);
   XCTAssertNil([b schema]);
   XCTAssertEqual([[b schemaError] code], (NSInteger)GTSErrorUnsupportedVersion);
 }
@@ -226,6 +226,21 @@ resolve(GTSSettingDescriptor *s, NSDictionary *global, NSDictionary *app, NSDict
   v = resolve(s, D(nil), D(nil), nil);
   XCTAssertEqual([v state], GTSValueDefault);
   XCTAssertEqualObjects([v effectiveValue], @"menubar");
+}
+
+- (void) testGumdropUppercaseInfoMenubarWinsAndResetInherits
+{
+  GTSSettingDescriptor *s = setting(@"Gumdrop", @"gumdrop.menu-style");
+  NSDictionary *info = D(@"MENUBAR", @"GumdropMenuStyle", nil);
+  GTSResolvedValue *v = resolve(s, D(nil), D(nil), info);
+  XCTAssertEqual([v state], GTSValueInfoPlist, @"value filter is case-insensitive like the theme");
+  /* App override, then reset: the next source shows through, never a write of primary. */
+  v = resolve(s, D(@"primary", @"GumdropMenuStyle", nil), D(@"menubar", @"GumdropMenuStyle", nil), info);
+  XCTAssertEqual([v state], GTSValueExplicit);
+  v = resolve(s, D(@"primary", @"GumdropMenuStyle", nil), D(nil), info);
+  XCTAssertEqual([v state], GTSValueInherited, @"after app reset: global");
+  v = resolve(s, D(nil), D(nil), info);
+  XCTAssertEqual([v state], GTSValueInfoPlist, @"after global reset too: app Info.plist");
 }
 
 - (void) testGumdropInvalidInfoValueEndsAsPrimary

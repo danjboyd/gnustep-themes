@@ -457,6 +457,12 @@ stateText(GTSResolvedValue *v, BOOL global)
           [[conflicts valueForKey: @"key"] componentsJoinedByString: @", "],
           [rebaseErr localizedDescription]]];
     }
+  else if ([err code] == GTSErrorWriteFailed)
+    [self setMessage: [NSString stringWithFormat:
+      @"The save may not have completed (%@). Reload to see what is stored now; "
+      @"your changes stay listed until they are confirmed.", [err localizedDescription]]];
+  else if ([err code] == GTSErrorNeedsReload)
+    [self setMessage: @"Reload first: the result of the previous save has not been confirmed."];
   else
     [self setMessage: [NSString stringWithFormat: @"Not saved: %@", [err localizedDescription]]];
   return NO;

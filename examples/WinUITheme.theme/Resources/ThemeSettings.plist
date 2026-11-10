@@ -2,7 +2,9 @@
    Keys and semantics from owner inventory msg #20845 at
    danjboyd/plugins-themes-winuitheme main 0619d01.
    Colour-mode keys and checking overrides are deliberately not listed.
-   Not compatibility evidence until the owner approves it. */
+   Owner review #20947 applied (overlay scrollbars, Mica help).
+   ThemeIdentifier is a proposed descriptor identity, not in WinUIThemeInfo.plist;
+   the owner chooses the final value. Native dialog keys do nothing off Windows. */
 {
   SchemaVersion = 1;
   Theme = WinUITheme;
@@ -52,7 +54,7 @@
     { /* Source/Native/WinUIThemeWindowIntegration.m:628-640 */
       Identifier = "winui.mica"; Key = WinUIThemeMica; Type = bool;
       Scopes = ( global, application ); Group = appearance;
-      Title = "Mica backdrop"; Help = "Always off in high contrast or when Windows' transparency effects are off; turning it on cannot override that.";
+      Title = "Mica backdrop"; Help = "Always off in high contrast, when Windows' transparency effects are off, and on panels and untitled windows; turning it on cannot override that.";
       Unset = { Behavior = static; Value = YES; };
       Apply = newWindows;
     },
@@ -66,8 +68,8 @@
     { /* Source/Rendering/WinUIThemeScrollers.m:60-75 */
       Identifier = "winui.overlay-scrollbars"; Key = WinUIThemeOverlayScrollbars; Type = bool;
       Scopes = ( global, application ); Group = appearance;
-      Title = "Overlay scrollbars"; Help = "Thin scrollbars that show while scrolling. Always classic in high contrast.";
-      Unset = { Behavior = dynamic; Help = "overlay unless Windows' \"Always show scrollbars\" is on"; };
+      Title = "Overlay scrollbars"; Help = "Thin scrollbars that show while scrolling.";
+      Unset = { Behavior = dynamic; Help = "overlay unless Windows' \"Always show scrollbars\" is on, or high contrast is on"; };
       Apply = live;
     },
     { /* Source/Native/WinUIThemeShellDialogs.m:1141-1146, 1559 */

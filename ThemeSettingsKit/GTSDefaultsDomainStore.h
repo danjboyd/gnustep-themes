@@ -90,6 +90,11 @@ typedef enum {
 
 /* Absolute directory where this process reads/writes defaults. */
 + (NSString*) defaultsRoot;
+/* YES only for GNUstep's file-based defaults backend on a POSIX system,
+   which is the only one whose failure modes this store checks. Elsewhere
+   every read and write fails with GTSErrorUnsupportedBackend (read-only
+   until a backend-specific check exists). */
++ (BOOL) isBackendSupported;
 
 /* Valid domain name: non-empty string, no '/', not starting with '.'. */
 + (BOOL) isValidDomainName: (id)name;

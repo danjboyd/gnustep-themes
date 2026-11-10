@@ -6,6 +6,7 @@
 #import "GTSEditSession.h"
 #import "GTSThemeSettingsSchema.h"
 #include <sys/stat.h>
+#include <unistd.h>
 
 /* NSUserDefaults whose -synchronize always reports failure. */
 @interface GTSFailingDefaults : NSUserDefaults
@@ -36,6 +37,24 @@
   if (okCount-- > 0) return [super snapshotForDomain: d error: e];
   if (e) *e = [NSError errorWithDomain: GTSErrorDomain code: GTSErrorUnreadableDomain userInfo: nil];
   return nil;
+}
+@end
+
+/* Commits for real, then reports a write failure (outcome-unknown case). */
+@interface GTSWriteThenFailStore : GTSDefaultsDomainStore
+{
+@public
+  BOOL reallyWrite;
+}
+@end
+@implementation GTSWriteThenFailStore
+- (BOOL) commitChanges: (NSDictionary*)c toDomain: (NSString*)d baseline: (GTSDomainSnapshot*)b
+             conflicts: (NSArray**)x error: (NSError**)e
+{
+  if (reallyWrite)
+    [super commitChanges: c toDomain: d baseline: b conflicts: x error: NULL];
+  if (e) *e = [NSError errorWithDomain: GTSErrorDomain code: GTSErrorWriteFailed userInfo: nil];
+  return NO;
 }
 @end
 
@@ -72,6 +91,7 @@ gumdropSetting(void)
 {
   chmod([file fileSystemRepresentation], 0600);
   chmod([[GTSDefaultsDomainStore defaultsRoot] fileSystemRepresentation], 0700);
+  chmod([[[GTSDefaultsDomainStore defaultsRoot] stringByDeletingLastPathComponent] fileSystemRepresentation], 0700);
   [store release]; [app release]; [file release];
   store = nil; app = nil; file = nil;
 }
@@ -275,6 +295,75 @@ gumdropSetting(void)
   XCTAssertFalse([s needsRebase]);
   XCTAssertNotNil([s applyWithConflicts: NULL error: NULL]);
   XCTAssertEqualObjects(GTSExternalRead(app, @"GumdropMenuStyle"), @"menubar");
+}
+
+- (void) testSnapshotOutlivesItsDefaultsInstanceAndPool
+{
+  GTSDomainSnapshot *s;
+  NSAutoreleasePool *pool = [NSAutoreleasePool new];
+  s = [[store snapshotForDomain: app error: NULL] retain];
+  [pool release];   /* the dedicated NSUserDefaults and its temporaries are gone */
+  XCTAssertEqualObjects([s objectForKey: @"GumdropMenuStyle"], @"menubar");
+  XCTAssertEqual([[s values] count], (NSUInteger)2);
+  [s release];
+}
+
+- (void) testDanglingSymlinkDomainFileFailsClosed
+{
+  NSError *err = nil;
+  unlink([file fileSystemRepresentation]);
+  symlink("/nonexistent/gts-target.plist", [file fileSystemRepresentation]);
+  XCTAssertNil([store snapshotForDomain: app error: &err], @"not treated as an absent domain");
+  XCTAssertEqual([err code], (NSInteger)GTSErrorUnreadableDomain);
+  [self assertCommitRefused: store code: GTSErrorUnreadableDomain];
+  XCTAssertTrue([[[NSFileManager defaultManager] fileAttributesAtPath: file traverseLink: NO]
+    objectForKey: NSFileType] == NSFileTypeSymbolicLink, @"link left in place");
+  unlink([file fileSystemRepresentation]);
+}
+
+- (void) testInaccessibleAncestorOfDefaultsRootFailsClosed
+{
+  NSString *parent = [[GTSDefaultsDomainStore defaultsRoot] stringByDeletingLastPathComponent];
+  NSError *err = nil;
+  chmod([parent fileSystemRepresentation], 0000);
+  XCTAssertNil([store snapshotForDomain: app error: &err], @"EACCES is not 'absent'");
+  XCTAssertEqual([err code], (NSInteger)GTSErrorUnreadableDomain);
+  [self assertCommitRefused: store code: GTSErrorUnreadableDomain];
+  chmod([parent fileSystemRepresentation], 0700);
+  XCTAssertEqualObjects(GTSExternalRead(app, @"GumdropMenuStyle"), @"menubar");
+}
+
+- (void) testWriteFailedAfterRealWriteGatesRetryAndRebaseReconciles
+{
+  GTSWriteThenFailStore *ws = [[[GTSWriteThenFailStore alloc] init] autorelease];
+  GTSEditSession *s;
+  NSError *err = nil;
+  ws->reallyWrite = YES;
+  s = [[[GTSEditSession alloc] initWithStore: ws domain: app error: NULL] autorelease];
+  [s stageValue: @"primary" forSetting: gumdropSetting() problem: NULL];
+  XCTAssertNil([s applyWithConflicts: NULL error: NULL], @"caller passed NULL error");
+  XCTAssertTrue([s needsRebase], @"unknown outcome gates retries even without an error pointer");
+  XCTAssertTrue([s hasChanges], @"intended edit kept");
+  XCTAssertEqualObjects(GTSExternalRead(app, @"GumdropMenuStyle"), @"primary", @"it did reach disk");
+  XCTAssertNil([s applyWithConflicts: NULL error: &err]);
+  XCTAssertEqual([err code], (NSInteger)GTSErrorNeedsReload);
+  XCTAssertNotNil([s rebaseWithError: NULL]);
+  XCTAssertFalse([s needsRebase]);
+  XCTAssertFalse([s hasChanges], @"already on disk, so nothing left to apply");
+}
+
+- (void) testWriteFailedBeforeWriteKeepsEditForRetryAfterReload
+{
+  GTSWriteThenFailStore *ws = [[[GTSWriteThenFailStore alloc] init] autorelease];
+  GTSEditSession *s;
+  ws->reallyWrite = NO;
+  s = [[[GTSEditSession alloc] initWithStore: ws domain: app error: NULL] autorelease];
+  [s stageValue: @"primary" forSetting: gumdropSetting() problem: NULL];
+  XCTAssertNil([s applyWithConflicts: NULL error: NULL]);
+  XCTAssertTrue([s needsRebase]);
+  XCTAssertEqualObjects(GTSExternalRead(app, @"GumdropMenuStyle"), @"menubar");
+  XCTAssertNotNil([s rebaseWithError: NULL]);
+  XCTAssertTrue([s hasChanges], @"not on disk, so still staged for a deliberate retry");
 }
 
 - (void) testSessionInitFailsOnUnreadableDomain

@@ -31,7 +31,7 @@ code references are ever evaluated.
 |---|---|---|
 | Logical theme | `ThemeIdentifier` (this file) | which theme the settings describe |
 | Package | the bundle's Info plist `CFBundleIdentifier` + `CFBundleVersion` (or `CFBundleShortVersionString`) | which build/fork was installed |
-| Artifact | path + fingerprint (digest of Info plist, ThemeSettings.plist, executable) | which installed copy, e.g. a USER copy shadowing an AppImage-bundled copy |
+| Location + descriptor fingerprint | path, plus a digest of Info plist, ThemeSettings.plist and executable (not a full integrity check; other resources are not covered) | which installed copy, e.g. a USER copy shadowing an AppImage-bundled copy |
 
 None is derived from another; shadowed copies are listed separately with their own package and artifact identity.
 

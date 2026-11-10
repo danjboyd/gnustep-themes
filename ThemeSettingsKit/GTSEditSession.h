@@ -65,9 +65,12 @@
 - (BOOL) needsRestart;
 
 /* Commit. Returns a receipt on success (also when nothing was staged).
-   Returns nil when nothing was saved: conflicts (*conflicts set), unreadable
-   domain, invalid input, write failure, or needsRebase. Staged changes and
-   baseline are kept in every nil case. */
+   Returns nil otherwise; staged changes and baseline are kept:
+   - nothing written: conflicts (*conflicts set), unreadable domain,
+     invalid input, or GTSErrorNeedsReload (needsRebase was set);
+   - OUTCOME UNKNOWN: GTSErrorWriteFailed. needsRebase is then set; a
+     successful -rebaseWithError: shows what reached disk and unstages
+     whatever already did. */
 - (GTSApplyReceipt*) applyWithConflicts: (NSArray**)conflicts error: (NSError**)error;
 /* Cancel: drop staged changes. */
 - (void) discardChanges;

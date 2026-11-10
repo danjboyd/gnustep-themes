@@ -143,9 +143,12 @@ void GTSRequireIsolatedDefaults(void)
 
 GTSToolResult *GTSRunDefaults(NSArray *args)
 {
-  NSString *tool = [[[NSProcessInfo processInfo] environment] objectForKey: @"GTS_DEFAULTS_TOOL"];
+  /* Only the tool the runner verified (same gnustep-base as the probe). */
+  NSString *tool = [[[NSProcessInfo processInfo] environment] objectForKey: @"GTS_VERIFIED_DEFAULTS_TOOL"];
   GTSRequireIsolatedDefaults();
-  return GTSRunTool(tool ? tool : @"/usr/bin/defaults", args, 20);
+  if ([tool length] == 0)
+    refuse(@"GTS_VERIFIED_DEFAULTS_TOOL not set; run the tests through scripts/run-tests.sh");
+  return GTSRunTool(tool, args, 20);
 }
 
 NSString *GTSMustRunDefaults(NSArray *args)
