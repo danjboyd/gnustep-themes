@@ -1,7 +1,7 @@
 # ThemeSettings.plist, schema version 1
 
-Status: proposed final, 2026-11-10, pending review by gnustep-tools-lead (the
-open questions are at the end). **Ground truth is the loader:** every rule
+Status: proposed final, accepted by gnustep-tools-lead at 26e599d (mailbox
+#22591, 2026-11-10); decisions in section 11. **Ground truth is the loader:** every rule
 below cites the code that enforces it. Where this text and the code
 disagree, the code is what every editor does today, and the disagreement is a
 bug to report. References:
@@ -39,7 +39,7 @@ no storage of its own, and the defaults domains stay the source of truth.
 | `Theme` | non-empty string | yes | The `GSTheme` value that selects this theme (S:500-501). |
 | `ThemeIdentifier` | non-empty string | yes | The logical theme identity, reverse DNS (S:502-504; the validator warns if it has no `.`, V:153). It names the theme, **not an installation**: forks and copies can share it. |
 | `RequiredFeatures` | array | no | Must be an array if present (S:505-507). Each entry not in `+supportedFeatures` makes the **whole theme read-only** (S:532-540, M:360). v1 supports none (S:563-569). |
-| `Groups` | array of `{Identifier, Title?, Help?}` | no | Copied as is (S:541). **Not used by the editor today.** The validator checks its shape and uniqueness (V:158-176). |
+| `Groups` | array of `{Identifier, Title?, Help?}` | no | Accepted; presentation not guaranteed (section 11). Copied as is (S:541) and not used by the editor today. The validator checks its shape and uniqueness (V:158-176). |
 | `Settings` | array | yes | Must be an array (S:508-510); it may be empty. |
 
 A file-level failure means the whole file is rejected and the theme shows no
@@ -198,20 +198,19 @@ editors load every setting as written. It does not prove that the theme
 really reads those keys with those meanings: only the theme owner can say
 that.
 
-## 11. Open questions (for review)
+## 11. Decisions (gnustep-tools-lead, mailbox #22591, on 26e599d)
 
-1. `Groups`/`Group` and `DependsOn` are parsed and validated, but the editor
-   ignores them. Keep them in v1 as "accepted, presentation not guaranteed",
-   or drop them from v1?
-2. A `Status` typo silently makes a setting public, and a non-numeric
-   `Minimum` silently becomes 0. Should the **loader** skip such settings
-   (stricter, still v1-compatible for correct files), or should this stay
-   validator-only?
-3. `number` values are stored exactly as typed (e.g. `"1.25"` as a string).
-   Should the editor store the normalized `NSNumber` description instead?
-   Themes that read the value with `-floatForKey:` accept both.
-4. Should duplicate `Key`s across descriptors be a loader error? Today
-   `settingForKey:` returns the first one (S:593-600), and the validator
-   reports an ERROR.
-5. Binary plists are not readable (S:446). Is text-only acceptable for v1?
-   Every theme repository uses OpenStep text.
+1. **Groups/Group and DependsOn stay in v1**, documented as *accepted;
+   presentation not guaranteed*. The validator checks them, and editors may
+   ignore them (the current one does).
+2. **Status typo, non-numeric or inverted Minimum/Maximum:** the loader
+   will skip the setting, with tests. This is a follow-up and **not yet
+   implemented**. Today only the validator reports these (V:227-229,
+   V:262-267).
+3. **Numbers are stored exactly as typed** in v1 (section 5). Themes must
+   accept a numeric string.
+4. **Duplicate `Key` across descriptors:** the loader will skip the
+   duplicate, in the same follow-up as 2 (**not yet implemented**; today
+   `settingForKey:` returns the first, S:593-600, and the validator reports
+   an ERROR).
+5. **Text property lists only** in v1 (OpenStep or XML; S:444-463).

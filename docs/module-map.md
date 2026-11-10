@@ -52,7 +52,7 @@ only; visual review of the screenshots has not been done independently.
 | Read-only AppImage targets in the editor | 62570a2 | 101/101 model tests; scenario G used a stand-in artifact and predates the final text | yes (#21659) |
 | Editor Apply callback contract in a real AppKit host (+ fix: typed text was read from live field-editor storage, so invalid text became a Reset that deleted the stored value) | 06a84a6 | scenario H, `Tests/HostCheck`: 14/14 host assertions on private Xvfb without a window manager; the reverted-fix control fails twice; fresh read-back; unit 110/110; harness 14/14 | yes (#22060) |
 | Installed Kit/UI libraries: scratch-prefix staging, out-of-tree host | 2aabcf7 | scenario I 16/16: staged-file hashes, no files in real LOCAL/USER paths, host build with no source-tree path, ldd/dladdr show both libraries from the stage, one Apply saved + read back; unit 110/110, H 14/14, harness 14/14 | yes (#22275); proves the scratch-prefix path only, not a real-domain install, stable ABI or a pane |
-| Schema v1 spec grounded in the loader (docs/schema-v1.md) + strict validator; Adwaita PR #138 head 2581c19 validates with 0 errors / 0 warnings | see git log | 27 fixtures, GTSSchemaValidatorTests 3/3, unit 113/113 | pending (open questions in spec section 11) |
+| Schema v1 spec grounded in the loader (docs/schema-v1.md) + strict validator; Adwaita PR #138 head 2581c19 validates with 0 errors / 0 warnings | 26e599d | 27 fixtures, GTSSchemaValidatorTests 3/3, unit 113/113 | yes (#22591), decisions in spec section 11; loader follow-up (Q2/Q4) not started |
 
 ## Unresolved proof gaps
 
