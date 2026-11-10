@@ -106,6 +106,18 @@
     @"explicit 'default' stays a separate, storable choice");
 }
 
+- (void) testAppResetRevealingGlobalValueIsShownAsInheritNotAutomatic
+{
+  GTSSettingRow *row;
+  GTSMustRunDefaults([NSArray arrayWithObjects: @"write", @"NSGlobalDomain", @"GnomeThemeColorScheme", @"force-dark", nil]);
+  [model reload];
+  [model selectThemeChoiceAtIndex: [[[model themeChoices] valueForKey: @"value"] indexOfObject: @"Adwaita"]];
+  row = [self rowNamed: @"adwaita.color-scheme"];
+  XCTAssertEqualObjects([[[row choices] objectAtIndex: 0] title], @"Same as all applications (Dark)");
+  XCTAssertEqualObjects([row stateText], @"Inherited from all applications");
+  GTSMustRunDefaults([NSArray arrayWithObjects: @"delete", @"NSGlobalDomain", @"GnomeThemeColorScheme", nil]);
+}
+
 - (void) testUnavailableSelectedThemeStaysVisible
 {
   GTSMustRunDefaults([NSArray arrayWithObjects: @"write", app, @"GSTheme", @"Vanished", nil]);
@@ -144,7 +156,7 @@
 - (void) testApplyRequirementIsStrongestStaged
 {
   NSMutableDictionary *p = [NSMutableDictionary dictionaryWithObjectsAndKeys: @"1", @"SchemaVersion",
-    @"T", @"Theme", [NSDictionary dictionaryWithObject: @"org.example.t" forKey: @"Identifier"], @"Provider", nil];
+    @"T", @"Theme", @"org.example.t", @"ThemeIdentifier", nil];
   NSDictionary *base = [NSDictionary dictionaryWithObjectsAndKeys: @"bool", @"Type",
     [NSArray arrayWithObject: @"application"], @"Scopes",
     [NSDictionary dictionaryWithObjectsAndKeys: @"static", @"Behavior", @"NO", @"Value", nil], @"Unset", nil];
@@ -166,5 +178,38 @@
   XCTAssertEqual([session applyRequirement], (int)GTSApplyNewWindows);
   [session stageThemeSelection: @"Adwaita"];
   XCTAssertEqual([session applyRequirement], (int)GTSApplyRestart);
+}
+@end
+
+@interface GTSEditorModelReadOnlyTests : XCTestCase
+@end
+
+@implementation GTSEditorModelReadOnlyTests
+- (void) testUnsupportedFeatureRowsAreReadOnly
+{
+  NSString *root = [GTSTestRoot() stringByAppendingPathComponent: @"rothemes"];
+  NSString *res = [root stringByAppendingPathComponent: @"Future.theme/Resources"];
+  NSString *app = GTSUniqueDomain(@"ro");
+  GTSThemeCatalog *catalog;
+  GTSEditorModel *m;
+  GTSSettingRow *row;
+  [[NSFileManager defaultManager] createDirectoryAtPath: res withIntermediateDirectories: YES
+                                             attributes: nil error: NULL];
+  [@"{ SchemaVersion = 1; Theme = Future; ThemeIdentifier = org.example.future;"
+   @"  Settings = ( { Identifier = f.x; Key = FutureX; Type = bool; Scopes = (application);"
+   @"  Unset = { Behavior = static; Value = NO; }; Apply = restart;"
+   @"  RequiredFeatures = ( conditional-values ); } ); }"
+    writeToFile: [res stringByAppendingPathComponent: @"ThemeSettings.plist"] atomically: YES];
+  GTSMustRunDefaults([NSArray arrayWithObjects: @"write", app, @"GSTheme", @"Future", nil]);
+  catalog = [[[GTSThemeCatalog alloc] initWithSearchRoots: [NSArray arrayWithObject:
+    [GTSThemeSearchRoot rootWithPath: root origin: GTSOriginSystem]]] autorelease];
+  m = [[[GTSEditorModel alloc] initWithStore: [[[GTSDefaultsDomainStore alloc] init] autorelease]
+                                     catalog: catalog] autorelease];
+  XCTAssertTrue([m setTargetApplicationDomain: app displayName: @"RO" info: nil]);
+  row = [[m rows] lastObject];
+  XCTAssertTrue([row isReadOnly]);
+  XCTAssertFalse([m selectChoiceAtIndex: 1 forRow: row]);
+  XCTAssertFalse([m hasChanges]);
+  XCTAssertTrue([[row note] rangeOfString: @"conditional-values"].location != NSNotFound);
 }
 @end

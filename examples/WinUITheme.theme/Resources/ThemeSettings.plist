@@ -1,44 +1,88 @@
-/* WinUITheme - semantics from owner report #20399 at 0619d01.
-   KEY NAMES/VALUES ARE PLACEHOLDERS until the winuitheme owner confirms. */
+/* WinUITheme - DRAFT for the winuitheme owner's review (they own this file).
+   Keys and semantics from owner inventory msg #20845 at
+   danjboyd/plugins-themes-winuitheme main 0619d01.
+   Colour-mode keys and checking overrides are deliberately not listed.
+   Not compatibility evidence until the owner approves it. */
 {
   SchemaVersion = 1;
   Theme = WinUITheme;
-  Provider = { Identifier = "org.gnustep.themes.winui"; Version = "0619d01"; };
+  ThemeIdentifier = "org.gnustep.themes.winui";
+  Groups = (
+    { Identifier = layout; Title = "Layout"; },
+    { Identifier = appearance; Title = "Appearance"; },
+    { Identifier = integration; Title = "Windows integration"; }
+  );
   Settings = (
-    {
-      Identifier = "winui.menu-style";
-      Key = WinUIMenuStyle;                /* TBC */
-      Type = enum;
-      Values = ( { Value = menubar; Title = "Menu bar"; }, { Value = window; Title = "In window"; } );  /* TBC */
-      Scopes = ( global, application );
-      Title = "Menu style";
-      Unset = { Behavior = static; Value = window; };  /* TBC */
-      Precedence = ( argument, application, { Source = applicationInfo; Values = ( menubar ); }, global, otherInfo );
+    { /* Source/Native/WinUIThemeToolbarInMenuBar.m:174-234 */
+      Identifier = "winui.menu-style"; Key = WinUIThemeMenuStyle; Type = enum; CaseInsensitive = YES;
+      Values = ( { Value = menubar; Title = "Menu bar"; }, { Value = more; Title = "Behind a \U2026 button"; } );
+      Scopes = ( global, application ); Group = layout;
+      Title = "Menus"; Help = "Put the app's menus behind a \U2026 button, as Edge and File Explorer do, instead of a menu bar.";
+      Unset = { Behavior = static; Value = menubar; };
+      Precedence = ( argument, application, { Source = applicationInfo; Values = ( menubar ); }, global,
+                     { Source = applicationInfo; Values = ( more ); } );
+      Apply = live;
+    },
+    { /* WinUIThemeToolbarInMenuBar.m:110-170; forced on while the menu style is "more" (:136-139) */
+      Identifier = "winui.toolbar-in-menu-bar"; Key = GSThemeToolbarInMenuBar; Type = bool;
+      Scopes = ( global, application ); Group = layout;
+      Title = "Toolbar in the menu bar row"; Help = "Suits a toolbar with a few icons. Always on while menus are behind the \U2026 button.";
+      Unset = { Behavior = static; Value = NO; };
+      Precedence = ( argument, application, { Source = applicationInfo; Values = ( NO ); }, global,
+                     { Source = applicationInfo; Values = ( YES ); } );
+      DependsOn = { Setting = "winui.menu-style"; Values = ( menubar ); };
+      Apply = live;
+    },
+    { /* Source/Settings/WinUIThemeSettings.m:48-80 */
+      Identifier = "winui.metrics"; Key = WinUIThemeMetrics; Type = enum; CaseInsensitive = YES;
+      Values = ( { Value = winui; Title = "WinUI sizes"; }, { Value = compact; Title = "Compact"; } );
+      Scopes = ( global, application ); Group = layout;
+      Title = "Control sizes"; Help = "WinUI sizes, or compact sizes for apps laid out with GNUstep's 12pt (Gorm or nib apps).";
+      Unset = { Behavior = dynamic; Help = "the app's own preference, else compact for Gorm/nib apps and WinUI otherwise"; };
+      Precedence = ( argument, application, global, applicationInfo );
       Apply = restart;
     },
-    {
-      Identifier = "winui.color-scheme";
-      Key = WinUIColorScheme;              /* TBC */
-      Type = enum;
-      Values = ( { Value = light; Title = "Light"; }, { Value = dark; Title = "Dark"; } );   /* TBC */
-      Scopes = ( global, application );
-      Title = "Color scheme";
-      /* No "follow OS" sentinel confirmed: removing an app override inherits global. */
-      Unset = { Behavior = dynamic; Help = "Follows the system preference when nothing is set globally."; };
-      Overlaps = ( "winui.prefer-dark", "winui.prefer-light" );
+    { /* Source/WinUITheme.m:123-131 */
+      Identifier = "winui.window-tabs"; Key = WinUIThemeWindowTabs; Type = bool;
+      Scopes = ( global, application ); Group = layout;
+      Title = "Window tabs"; Help = "Windows 11-style tabs for apps that support window tabbing.";
+      Unset = { Behavior = static; Value = YES; };
       Apply = restart;
     },
-    {
-      Identifier = "winui.prefer-dark"; Key = WinUIPreferDark; Type = bool;   /* TBC */
-      Scopes = ( global, application ); Title = "Prefer dark";
-      Unset = { Behavior = dynamic; Help = "Decided by color scheme / system."; };
-      Overlaps = ( "winui.color-scheme" ); Apply = restart; Status = unstable;
+    { /* Source/Native/WinUIThemeWindowIntegration.m:628-640 */
+      Identifier = "winui.mica"; Key = WinUIThemeMica; Type = bool;
+      Scopes = ( global, application ); Group = appearance;
+      Title = "Mica backdrop"; Help = "Always off in high contrast or when Windows' transparency effects are off; turning it on cannot override that.";
+      Unset = { Behavior = static; Value = YES; };
+      Apply = newWindows;
     },
-    {
-      Identifier = "winui.prefer-light"; Key = WinUIPreferLight; Type = bool;  /* TBC */
-      Scopes = ( global, application ); Title = "Prefer light";
-      Unset = { Behavior = dynamic; Help = "Decided by color scheme / system."; };
-      Overlaps = ( "winui.color-scheme" ); Apply = restart; Status = unstable;
+    { /* Source/Rendering/WinUIThemeMotion.m:158-180 */
+      Identifier = "winui.animations"; Key = WinUIThemeAnimations; Type = bool;
+      Scopes = ( global, application ); Group = appearance;
+      Title = "Animations";
+      Unset = { Behavior = dynamic; Help = "Windows' Animation effects setting"; };
+      Apply = live;
+    },
+    { /* Source/Rendering/WinUIThemeScrollers.m:60-75 */
+      Identifier = "winui.overlay-scrollbars"; Key = WinUIThemeOverlayScrollbars; Type = bool;
+      Scopes = ( global, application ); Group = appearance;
+      Title = "Overlay scrollbars"; Help = "Thin scrollbars that show while scrolling. Always classic in high contrast.";
+      Unset = { Behavior = dynamic; Help = "overlay unless Windows' \"Always show scrollbars\" is on"; };
+      Apply = live;
+    },
+    { /* Source/Native/WinUIThemeShellDialogs.m:1141-1146, 1559 */
+      Identifier = "winui.native-file-dialogs"; Key = WinUIThemeNativeFileDialogs; Type = bool;
+      Scopes = ( global, application ); Group = integration;
+      Title = "Windows Open and Save dialogs"; Help = "Panels with an accessory view still use GNUstep's.";
+      Unset = { Behavior = static; Value = YES; };
+      Apply = live;
+    },
+    { /* Source/Native/WinUIThemeShellDialogs.m:1141-1146, 1380, 1460 */
+      Identifier = "winui.native-print-dialogs"; Key = WinUIThemeNativePrintDialogs; Type = bool;
+      Scopes = ( global, application ); Group = integration;
+      Title = "Windows Print dialog";
+      Unset = { Behavior = static; Value = YES; };
+      Apply = live;
     }
   );
 }

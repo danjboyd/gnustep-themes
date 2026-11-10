@@ -248,6 +248,35 @@ static NSArray *knownSources = nil;
       return nil;
     }
 
+  if (d->_type == GTSSettingTypeNumber)
+    {
+      id mn = [p objectForKey: @"Minimum"], mx = [p objectForKey: @"Maximum"];
+      if ((mn && ![mn respondsToSelector: @selector(doubleValue)])
+        || (mx && ![mx respondsToSelector: @selector(doubleValue)]))
+        {
+          [problems addObject: [NSString stringWithFormat: @"%@: Minimum/Maximum must be numbers", where]];
+          return nil;
+        }
+      if (mn) d->_minimum = [[NSNumber alloc] initWithDouble: [mn doubleValue]];
+      if (mx) d->_maximum = [[NSNumber alloc] initWithDouble: [mx doubleValue]];
+    }
+  o = [p objectForKey: @"RequiredFeatures"];
+  if (o != nil && ![o isKindOfClass: [NSArray class]])
+    {
+      [problems addObject: [NSString stringWithFormat: @"%@: RequiredFeatures must be an array", where]];
+      return nil;
+    }
+  else
+    {
+      NSMutableArray *missing = [NSMutableArray array];
+      NSEnumerator *fe = [o objectEnumerator];
+      id f;
+      while ((f = [fe nextObject]) != nil)
+        if (![[GTSThemeSettingsSchema supportedFeatures] containsObject: f])
+          [missing addObject: [f description]];
+      d->_unsupportedFeatures = [missing copy];
+    }
+
   d->_dependsOn = [[p objectForKey: @"DependsOn"] copy];
   d->_overlaps = [([p objectForKey: @"Overlaps"] ? [p objectForKey: @"Overlaps"] : [NSArray array]) copy];
   d->_unstable = [[p objectForKey: @"Status"] isEqual: @"unstable"];
@@ -266,6 +295,7 @@ static NSArray *knownSources = nil;
   [_group release]; [_title release]; [_help release]; [_unsetValue release];
   [_unsetHelp release]; [_precedence release]; [_infoKey release];
   [_dependsOn release]; [_overlaps release];
+  [_minimum release]; [_maximum release]; [_unsupportedFeatures release];
   [super dealloc];
 }
 
@@ -289,6 +319,10 @@ static NSArray *knownSources = nil;
 - (NSDictionary*) dependsOn { return _dependsOn; }
 - (NSArray*) overlaps { return _overlaps; }
 - (BOOL) isUnstable { return _unstable; }
+- (NSNumber*) minimum { return _minimum; }
+- (NSNumber*) maximum { return _maximum; }
+- (NSArray*) unsupportedFeatures { return _unsupportedFeatures; }
+- (BOOL) isReadOnly { return [_unsupportedFeatures count] > 0; }
 
 - (NSString*) problemWithValue: (id)value
 {
@@ -299,14 +333,25 @@ static NSArray *knownSources = nil;
       case GTSSettingTypeBool:
         return GTSBoolValue(value) < 0 ? @"not a boolean" : nil;
       case GTSSettingTypeNumber:
-        if ([value isKindOfClass: [NSNumber class]]) return nil;
-        if ([value isKindOfClass: [NSString class]])
-          {
-            NSScanner *sc = [NSScanner scannerWithString: value];
-            double dv;
-            if ([sc scanDouble: &dv] && [sc isAtEnd]) return nil;
-          }
-        return @"not a number";
+        {
+          double dv = 0;
+          BOOL ok = NO;
+          if ([value isKindOfClass: [NSNumber class]])
+            {
+              dv = [value doubleValue];
+              ok = YES;
+            }
+          else if ([value isKindOfClass: [NSString class]])
+            {
+              NSScanner *sc = [NSScanner scannerWithString: value];
+              ok = [sc scanDouble: &dv] && [sc isAtEnd];
+            }
+          if (!ok) return @"not a number";
+          if ((_minimum && dv < [_minimum doubleValue]) || (_maximum && dv > [_maximum doubleValue]))
+            return [NSString stringWithFormat: @"%g is outside %@-%@", dv,
+              _minimum ? [_minimum description] : @"", _maximum ? [_maximum description] : @""];
+          return nil;
+        }
       case GTSSettingTypeString:
         return [value isKindOfClass: [NSString class]] ? nil : @"not a string";
       case GTSSettingTypeEnum:
@@ -439,9 +484,12 @@ static NSArray *knownSources = nil;
       ([NSString stringWithFormat: @"unsupported SchemaVersion %ld", (long)version]));
   if (!isString([plist objectForKey: @"Theme"]))
     FAIL(GTSErrorInvalidSchema, @"missing Theme");
-  prov = [plist objectForKey: @"Provider"];
-  if (![prov isKindOfClass: [NSDictionary class]] || !isString([prov objectForKey: @"Identifier"]))
-    FAIL(GTSErrorInvalidSchema, @"missing Provider.Identifier");
+  prov = [plist objectForKey: @"ThemeIdentifier"];
+  if (!isString(prov))
+    FAIL(GTSErrorInvalidSchema, @"missing ThemeIdentifier");
+  o = [plist objectForKey: @"RequiredFeatures"];
+  if (o != nil && ![o isKindOfClass: [NSArray class]])
+    FAIL(GTSErrorInvalidSchema, @"RequiredFeatures must be an array");
   o = [plist objectForKey: @"Settings"];
   if (![o isKindOfClass: [NSArray class]])
     FAIL(GTSErrorInvalidSchema, @"missing Settings array");
@@ -465,8 +513,16 @@ static NSArray *knownSources = nil;
   s->_path = [path copy];
   s->_version = version;
   s->_theme = [[plist objectForKey: @"Theme"] copy];
-  s->_providerIdentifier = [[prov objectForKey: @"Identifier"] copy];
-  s->_providerVersion = [[prov objectForKey: @"Version"] copy];
+  s->_themeIdentifier = [prov copy];
+  {
+    NSMutableArray *missing = [NSMutableArray array];
+    NSEnumerator *fe = [[plist objectForKey: @"RequiredFeatures"] objectEnumerator];
+    id f;
+    while ((f = [fe nextObject]) != nil)
+      if (![[self supportedFeatures] containsObject: f])
+        [missing addObject: [f description]];
+    s->_unsupportedFeatures = [missing copy];
+  }
   s->_groups = [([plist objectForKey: @"Groups"] ? [plist objectForKey: @"Groups"] : [NSArray array]) copy];
   s->_settings = [settings copy];
   s->_warnings = [problems copy];
@@ -476,7 +532,7 @@ static NSArray *knownSources = nil;
 - (void) dealloc
 {
   [_path release]; [_bundlePath release]; [_theme release];
-  [_providerIdentifier release]; [_providerVersion release];
+  [_themeIdentifier release]; [_unsupportedFeatures release];
   [_groups release]; [_settings release]; [_warnings release];
   [super dealloc];
 }
@@ -485,8 +541,17 @@ static NSArray *knownSources = nil;
 - (NSString*) bundlePath { return _bundlePath; }
 - (NSInteger) version { return _version; }
 - (NSString*) theme { return _theme; }
-- (NSString*) providerIdentifier { return _providerIdentifier; }
-- (NSString*) providerVersion { return _providerVersion; }
+- (NSString*) themeIdentifier { return _themeIdentifier; }
+- (NSArray*) unsupportedFeatures { return _unsupportedFeatures; }
+- (BOOL) isReadOnly { return [_unsupportedFeatures count] > 0; }
+
++ (NSArray*) supportedFeatures
+{
+  /* v1 readers implement everything described in docs/schema-v1.md and
+     nothing else. Themes list a feature here only when ignoring it would
+     make an editor write something wrong. */
+  return [NSArray array];
+}
 - (NSArray*) groups { return _groups; }
 - (NSArray*) settings { return _settings; }
 - (NSArray*) warnings { return _warnings; }

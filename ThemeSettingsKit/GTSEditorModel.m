@@ -40,6 +40,7 @@
 - (BOOL) canReset { return _canReset; }
 - (BOOL) isFreeForm { return _isFreeForm; }
 - (NSString*) text { return _text; }
+- (BOOL) isReadOnly { return _readOnly; }
 - (NSString*) description
 {
   return [NSString stringWithFormat: @"<row %@ [%@] sel=%ld %@>", _title,
@@ -211,9 +212,14 @@ stateText(GTSResolvedValue *v, BOOL global)
       @"GNUstep falls back to its default theme.", [r name]];
   if ([r isBuiltIn])
     return @"The built-in GNUstep theme has no theme settings.";
-  if ([r providerIdentifier])
-    [parts addObject: [NSString stringWithFormat: @"%@ %@ (%@)", [r providerIdentifier],
-      [r providerVersion] ? [r providerVersion] : @"", [r origin]]];
+  [parts addObject: [NSString stringWithFormat: @"%@%@%@ - %@ copy at %@",
+    [r themeIdentifier] ? [r themeIdentifier] : [r name],
+    [r bundleVersion] ? @" " : @"", [r bundleVersion] ? [r bundleVersion] : @"",
+    [r origin], [r path]]];
+  if ([[r schema] isReadOnly])
+    [parts addObject: [NSString stringWithFormat: @"Shown read-only: this theme requires %@, "
+      @"which this version of the settings editor does not understand.",
+      [[[r schema] unsupportedFeatures] componentsJoinedByString: @", "]]];
   if ([[r shadowedRecords] count] > 0)
     [parts addObject: [NSString stringWithFormat: @"Overrides %lu other installed copy(ies): %@",
       (unsigned long)[[r shadowedRecords] count],
@@ -288,7 +294,11 @@ stateText(GTSResolvedValue *v, BOOL global)
       row->_setting = [s retain];
       row->_title = [[sc localizedString: [s title]] copy];
       row->_stateText = [stateText(v, [self targetIsGlobal]) copy];
-      row->_canReset = [v hasOverride];
+      row->_readOnly = [s isReadOnly] || [sc isReadOnly];
+      row->_canReset = [v hasOverride] && !row->_readOnly;
+      if ([s isReadOnly])
+        [notes addObject: [NSString stringWithFormat: @"Read-only: needs %@.",
+          [[s unsupportedFeatures] componentsJoinedByString: @", "]]];
 
       [choices addObject: [GTSChoice choiceWithTitle: [self unsetTitleFor: s resolved: v] value: nil]];
       if ([s type] == GTSSettingTypeBool)
@@ -337,10 +347,18 @@ stateText(GTSResolvedValue *v, BOOL global)
   return rows;
 }
 
+- (BOOL) refuseReadOnly: (GTSSettingRow*)row
+{
+  if (![row isReadOnly]) return NO;
+  [self setMessage: [NSString stringWithFormat: @"%@ is read-only in this version of the editor.", [row title]]];
+  return YES;
+}
+
 - (BOOL) selectChoiceAtIndex: (NSInteger)index forRow: (GTSSettingRow*)row
 {
   id value;
   NSString *problem = nil;
+  if ([self refuseReadOnly: row]) return NO;
   if (index < 0 || (NSUInteger)index >= [[row choices] count]) return NO;
   value = [[[row choices] objectAtIndex: index] value];
   if (value == nil)
@@ -359,6 +377,7 @@ stateText(GTSResolvedValue *v, BOOL global)
 - (BOOL) setText: (NSString*)text forRow: (GTSSettingRow*)row
 {
   NSString *problem = nil;
+  if ([self refuseReadOnly: row]) return NO;
   if ([text length] == 0)
     {
       [_session stageResetForSetting: [row setting]];
@@ -374,6 +393,7 @@ stateText(GTSResolvedValue *v, BOOL global)
 
 - (void) resetRow: (GTSSettingRow*)row
 {
+  if ([self refuseReadOnly: row]) return;
   [_session stageResetForSetting: [row setting]];
 }
 

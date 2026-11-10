@@ -2,6 +2,7 @@
 #import "GTSThemeCatalog.h"
 #import "GTSThemeSettingsSchema.h"
 #import "GTSDefaultsDomainStore.h"
+#import <GNUstepBase/NSData+GNUstepBase.h>
 
 @interface GTSThemeRecord (Private)
 + (GTSThemeRecord*) recordWithName: (NSString*)name path: (NSString*)path origin: (NSString*)origin;
@@ -58,7 +59,7 @@ NSString * const GTSDefaultThemeName = @"GNUstep";
 - (void) dealloc
 {
   [_name release]; [_path release]; [_origin release]; [_info release];
-  [_schema release]; [_schemaError release]; [_shadowed release];
+  [_schema release]; [_schemaError release]; [_shadowed release]; [_fingerprint release];
   [super dealloc];
 }
 
@@ -75,16 +76,53 @@ NSString * const GTSDefaultThemeName = @"GNUstep";
 - (NSError*) schemaError { return _schemaError; }
 - (NSArray*) shadowedRecords { return _shadowed; }
 
-- (NSString*) providerIdentifier
+static NSString *
+stringOrNil(id o)
 {
-  if (_schema != nil) return [_schema providerIdentifier];
-  return [_info objectForKey: @"CFBundleIdentifier"];
+  return [o isKindOfClass: [NSString class]] ? o : nil;
 }
 
-- (NSString*) providerVersion
+- (NSString*) themeIdentifier { return [_schema themeIdentifier]; }
+- (NSString*) bundleIdentifier { return stringOrNil([_info objectForKey: @"CFBundleIdentifier"]); }
+- (NSString*) bundleVersion
 {
-  if ([_schema providerVersion] != nil) return [_schema providerVersion];
-  return [_info objectForKey: @"CFBundleVersion"];
+  NSString *v = stringOrNil([_info objectForKey: @"CFBundleVersion"]);
+  return v ? v : stringOrNil([_info objectForKey: @"CFBundleShortVersionString"]);
+}
+
+- (NSString*) fingerprint
+{
+  NSMutableData *all;
+  NSEnumerator *e;
+  NSString *p;
+  NSData *digest;
+  NSMutableString *hex;
+  const unsigned char *b;
+  NSUInteger i;
+  NSString *exe;
+
+  if (_fingerprint != nil || _path == nil) return _fingerprint;
+  all = [NSMutableData data];
+  /* executablePath only locates the file; it does not load code. */
+  exe = [[NSBundle bundleWithPath: _path] executablePath];
+  e = [[NSArray arrayWithObjects:
+    [_path stringByAppendingPathComponent: @"Resources/Info-gnustep.plist"],
+    [_path stringByAppendingPathComponent: @"Resources/ThemeSettings.plist"],
+    exe ? exe : @"", nil] objectEnumerator];
+  while ((p = [e nextObject]) != nil)
+    {
+      NSData *d = [p length] ? [NSData dataWithContentsOfFile: p] : nil;
+      unsigned long long n = d ? [d length] : 0;
+      [all appendBytes: &n length: sizeof(n)];   /* separates the parts */
+      if (d) [all appendData: d];
+    }
+  digest = [all md5Digest];
+  hex = [NSMutableString string];
+  b = [digest bytes];
+  for (i = 0; i < [digest length]; i++)
+    [hex appendFormat: @"%02x", b[i]];
+  _fingerprint = [hex copy];
+  return _fingerprint;
 }
 
 - (NSString*) description

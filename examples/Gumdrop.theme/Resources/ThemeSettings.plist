@@ -1,9 +1,11 @@
-/* Gumdrop (fun-themes) - semantics from owner inventory, msg #20599 at b3a960d8,
-   Source/GumdropMenus.m:65-76, GumdropWindow.m:201,522-576. Owner to verify. */
+/* Gumdrop (fun-themes) - DRAFT for the fun-themes owner's review.
+   Semantics from owner msgs #20599/#20861 at b3a960d, Source/GumdropMenus.m:65-76,
+   GumdropWindow.m:201,522-576. An Info.plist value other than "menubar" ends as
+   primary, so only "menubar" is listed as winning from Info.plist. */
 {
   SchemaVersion = 1;
   Theme = Gumdrop;
-  Provider = { Identifier = "org.gnustep.themes.gumdrop"; Version = "b3a960d8"; };
+  ThemeIdentifier = "org.gnustep.themes.gumdrop";
   Groups = ( { Identifier = menus; Title = "Menus"; } );
   Settings = (
     {
@@ -21,7 +23,7 @@
       /* Unset: falls back to the main app's Info.plist, then primary.
          Removing an override is NOT the same as storing primary. */
       Unset = { Behavior = static; Value = primary; };
-      Precedence = ( argument, application, global, applicationInfo );
+      Precedence = ( argument, application, global, { Source = applicationInfo; Values = ( menubar ); } );
       Apply = restart;
     }
   );

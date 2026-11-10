@@ -37,6 +37,7 @@ extern NSString * const GTSDefaultThemeName;
   NSError *_schemaError;
   NSArray *_shadowed;
   BOOL _available;
+  NSString *_fingerprint;
 }
 - (NSString*) name;
 - (NSString*) path;                 /* nil when unavailable */
@@ -44,8 +45,16 @@ extern NSString * const GTSDefaultThemeName;
 - (BOOL) isAvailable;               /* NO: selected by name but not found */
 - (BOOL) isBuiltIn;                 /* GNUstep default theme, no bundle */
 - (NSDictionary*) infoDictionary;   /* bundle Info plist, may be nil */
-- (NSString*) providerIdentifier;   /* schema Provider, else CFBundleIdentifier, else nil */
-- (NSString*) providerVersion;
+/* Three separate identities; none is derived from another.
+   themeIdentifier: logical theme (ThemeSettings.plist), may be nil.
+   bundleIdentifier/bundleVersion: package identity from the bundle's Info.
+   fingerprint: this installed artifact (path-independent digest of Info,
+   ThemeSettings.plist and executable), distinguishes copies/forks that
+   share the other two. */
+- (NSString*) themeIdentifier;
+- (NSString*) bundleIdentifier;
+- (NSString*) bundleVersion;
+- (NSString*) fingerprint;
 - (GTSThemeSettingsSchema*) schema; /* nil: no or invalid metadata */
 - (NSError*) schemaError;           /* why schema is nil, if it had a file */
 - (NSArray*) shadowedRecords;       /* lower-priority same-name copies */

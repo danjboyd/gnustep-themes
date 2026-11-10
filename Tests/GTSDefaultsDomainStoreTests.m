@@ -22,7 +22,7 @@
     [NSUserDefaults standardUserDefaults]];
   app = [GTSUniqueDomain(@"app") retain];
   GTSMustRunDefaults([NSArray arrayWithObjects: @"write", app, @"GSTheme", @"Adwaita", nil]);
-  GTSMustRunDefaults([NSArray arrayWithObjects: @"write", app, @"AdwaitaColorScheme", @"dark", nil]);
+  GTSMustRunDefaults([NSArray arrayWithObjects: @"write", app, @"SyntheticSchemeKey", @"dark", nil]);
   GTSMustRunDefaults([NSArray arrayWithObjects: @"write", app, @"Unrelated", @"keep-me", nil]);
   /* A value for a theme that is not selected: must survive every edit. */
   GTSMustRunDefaults([NSArray arrayWithObjects: @"write", app, @"GumdropMenuStyle", @"menubar", nil]);
@@ -52,14 +52,14 @@
   GTSMustRunDefaults([NSArray arrayWithObjects: @"write", @"NSGlobalDomain", g, @"global-only", nil]);
 
   s = [store snapshotForDomain: app error: NULL];
-  XCTAssertEqualObjects([s objectForKey: @"AdwaitaColorScheme"], @"dark");
+  XCTAssertEqualObjects([s objectForKey: @"SyntheticSchemeKey"], @"dark");
   XCTAssertEqualObjects([s objectForKey: @"Unrelated"], @"keep-me");
   XCTAssertNil([s objectForKey: g], @"app snapshot must not include global keys");
   XCTAssertEqual([[s values] count], (NSUInteger)4);
 
   s = [store snapshotForDomain: NSGlobalDomain error: NULL];
   XCTAssertEqualObjects([s objectForKey: g], @"global-only");
-  XCTAssertNil([s objectForKey: @"AdwaitaColorScheme"]);
+  XCTAssertNil([s objectForKey: @"SyntheticSchemeKey"]);
 
   GTSMustRunDefaults([NSArray arrayWithObjects: @"delete", @"NSGlobalDomain", g, nil]);
 }
@@ -67,10 +67,10 @@
 - (void) testSnapshotSeesLaterExternalWrite
 {
   GTSDomainSnapshot *s = [store snapshotForDomain: app error: NULL];
-  XCTAssertEqualObjects([s objectForKey: @"AdwaitaColorScheme"], @"dark");
-  GTSMustRunDefaults([NSArray arrayWithObjects: @"write", app, @"AdwaitaColorScheme", @"light", nil]);
+  XCTAssertEqualObjects([s objectForKey: @"SyntheticSchemeKey"], @"dark");
+  GTSMustRunDefaults([NSArray arrayWithObjects: @"write", app, @"SyntheticSchemeKey", @"light", nil]);
   s = [store snapshotForDomain: app error: NULL];
-  XCTAssertEqualObjects([s objectForKey: @"AdwaitaColorScheme"], @"light",
+  XCTAssertEqualObjects([s objectForKey: @"SyntheticSchemeKey"], @"light",
     @"snapshot must re-read a foreign domain changed by another process");
 }
 
@@ -86,10 +86,10 @@
   GTSDomainSnapshot *b = [store snapshotForDomain: app error: NULL];
   NSArray *conflicts = nil;
   NSError *err = nil;
-  BOOL ok = [store removeKey: @"AdwaitaColorScheme" fromDomain: app baseline: b
+  BOOL ok = [store removeKey: @"SyntheticSchemeKey" fromDomain: app baseline: b
                    conflicts: &conflicts error: &err];
   XCTAssertTrue(ok, @"%@", err);
-  XCTAssertNil(GTSExternalRead(app, @"AdwaitaColorScheme"), @"key must be absent, not a fallback value");
+  XCTAssertNil(GTSExternalRead(app, @"SyntheticSchemeKey"), @"key must be absent, not a fallback value");
   XCTAssertEqualObjects(GTSExternalRead(app, @"GSTheme"), @"Adwaita");
   XCTAssertEqualObjects(GTSExternalRead(app, @"Unrelated"), @"keep-me");
   XCTAssertEqualObjects(GTSExternalRead(app, @"GumdropMenuStyle"), @"menubar");
@@ -98,10 +98,10 @@
 - (void) testSetPreservesUnrelatedAndInactiveThemeKeys
 {
   GTSDomainSnapshot *b = [store snapshotForDomain: app error: NULL];
-  BOOL ok = [store commitChanges: [NSDictionary dictionaryWithObject: @"light" forKey: @"AdwaitaColorScheme"]
+  BOOL ok = [store commitChanges: [NSDictionary dictionaryWithObject: @"light" forKey: @"SyntheticSchemeKey"]
                         toDomain: app baseline: b conflicts: NULL error: NULL];
   XCTAssertTrue(ok);
-  XCTAssertEqualObjects(GTSExternalRead(app, @"AdwaitaColorScheme"), @"light");
+  XCTAssertEqualObjects(GTSExternalRead(app, @"SyntheticSchemeKey"), @"light");
   XCTAssertEqualObjects(GTSExternalRead(app, @"Unrelated"), @"keep-me");
   XCTAssertEqualObjects(GTSExternalRead(app, @"GumdropMenuStyle"), @"menubar");
 }
@@ -131,20 +131,20 @@
   BOOL ok;
   GTSConflict *c;
 
-  GTSMustRunDefaults([NSArray arrayWithObjects: @"write", app, @"AdwaitaColorScheme", @"light", nil]);
+  GTSMustRunDefaults([NSArray arrayWithObjects: @"write", app, @"SyntheticSchemeKey", @"light", nil]);
   ok = [store commitChanges: [NSDictionary dictionaryWithObjectsAndKeys:
-         @"default", @"AdwaitaColorScheme", @"WinUITheme", @"GSTheme", nil]
+         @"default", @"SyntheticSchemeKey", @"WinUITheme", @"GSTheme", nil]
        toDomain: app baseline: b conflicts: &conflicts error: &err];
   XCTAssertFalse(ok);
   XCTAssertEqual([err code], (NSInteger)GTSErrorConflict);
   XCTAssertEqual([conflicts count], (NSUInteger)1);
   c = [conflicts lastObject];
-  XCTAssertEqualObjects([c key], @"AdwaitaColorScheme");
+  XCTAssertEqualObjects([c key], @"SyntheticSchemeKey");
   XCTAssertEqualObjects([c baselineValue], @"dark");
   XCTAssertEqualObjects([c currentValue], @"light");
   XCTAssertEqualObjects([c proposedValue], @"default");
   /* All-or-nothing: the non-conflicting GSTheme change was not written either. */
-  XCTAssertEqualObjects(GTSExternalRead(app, @"AdwaitaColorScheme"), @"light");
+  XCTAssertEqualObjects(GTSExternalRead(app, @"SyntheticSchemeKey"), @"light");
   XCTAssertEqualObjects(GTSExternalRead(app, @"GSTheme"), @"Adwaita");
 }
 
@@ -152,8 +152,8 @@
 {
   GTSDomainSnapshot *b = [store snapshotForDomain: app error: NULL];
   NSArray *conflicts = nil;
-  GTSMustRunDefaults([NSArray arrayWithObjects: @"delete", app, @"AdwaitaColorScheme", nil]);
-  XCTAssertFalse([store commitChanges: [NSDictionary dictionaryWithObject: @"light" forKey: @"AdwaitaColorScheme"]
+  GTSMustRunDefaults([NSArray arrayWithObjects: @"delete", app, @"SyntheticSchemeKey", nil]);
+  XCTAssertFalse([store commitChanges: [NSDictionary dictionaryWithObject: @"light" forKey: @"SyntheticSchemeKey"]
                              toDomain: app baseline: b conflicts: &conflicts error: NULL]);
   XCTAssertNil([[conflicts lastObject] currentValue]);
 }
@@ -162,10 +162,10 @@
 {
   GTSDomainSnapshot *b = [store snapshotForDomain: app error: NULL];
   GTSMustRunDefaults([NSArray arrayWithObjects: @"write", app, @"OtherApp", @"external", nil]);
-  XCTAssertTrue([store removeKey: @"AdwaitaColorScheme" fromDomain: app baseline: b
+  XCTAssertTrue([store removeKey: @"SyntheticSchemeKey" fromDomain: app baseline: b
                        conflicts: NULL error: NULL]);
   XCTAssertEqualObjects(GTSExternalRead(app, @"OtherApp"), @"external");
-  XCTAssertNil(GTSExternalRead(app, @"AdwaitaColorScheme"));
+  XCTAssertNil(GTSExternalRead(app, @"SyntheticSchemeKey"));
 }
 
 /* Interleaving: another process writes between our check and our write. */
@@ -175,10 +175,10 @@
   GTSDomainSnapshot *b = [store snapshotForDomain: app error: NULL];
   hookArgs = [[NSArray alloc] initWithObjects: @"write", app, @"Interleaved", @"yes", nil];
   [store setPreWriteHookTarget: self selector: @selector(runHook:)];
-  XCTAssertTrue([store commitChanges: [NSDictionary dictionaryWithObject: @"light" forKey: @"AdwaitaColorScheme"]
+  XCTAssertTrue([store commitChanges: [NSDictionary dictionaryWithObject: @"light" forKey: @"SyntheticSchemeKey"]
                             toDomain: app baseline: b conflicts: NULL error: NULL]);
   XCTAssertEqualObjects(GTSExternalRead(app, @"Interleaved"), @"yes");
-  XCTAssertEqualObjects(GTSExternalRead(app, @"AdwaitaColorScheme"), @"light");
+  XCTAssertEqualObjects(GTSExternalRead(app, @"SyntheticSchemeKey"), @"light");
 }
 
 - (void) testInterleavedRemovalIsNotResurrected
@@ -186,7 +186,7 @@
   GTSDomainSnapshot *b = [store snapshotForDomain: app error: NULL];
   hookArgs = [[NSArray alloc] initWithObjects: @"delete", app, @"Unrelated", nil];
   [store setPreWriteHookTarget: self selector: @selector(runHook:)];
-  XCTAssertTrue([store commitChanges: [NSDictionary dictionaryWithObject: @"light" forKey: @"AdwaitaColorScheme"]
+  XCTAssertTrue([store commitChanges: [NSDictionary dictionaryWithObject: @"light" forKey: @"SyntheticSchemeKey"]
                             toDomain: app baseline: b conflicts: NULL error: NULL]);
   XCTAssertNil(GTSExternalRead(app, @"Unrelated"),
     @"a key removed by another process inside the window must stay removed");
@@ -197,11 +197,11 @@
 - (void) testResidualRaceSameKeyLastWriterWins
 {
   GTSDomainSnapshot *b = [store snapshotForDomain: app error: NULL];
-  hookArgs = [[NSArray alloc] initWithObjects: @"write", app, @"AdwaitaColorScheme", @"external", nil];
+  hookArgs = [[NSArray alloc] initWithObjects: @"write", app, @"SyntheticSchemeKey", @"external", nil];
   [store setPreWriteHookTarget: self selector: @selector(runHook:)];
-  XCTAssertTrue([store commitChanges: [NSDictionary dictionaryWithObject: @"light" forKey: @"AdwaitaColorScheme"]
+  XCTAssertTrue([store commitChanges: [NSDictionary dictionaryWithObject: @"light" forKey: @"SyntheticSchemeKey"]
                             toDomain: app baseline: b conflicts: NULL error: NULL]);
-  XCTAssertEqualObjects(GTSExternalRead(app, @"AdwaitaColorScheme"), @"light",
+  XCTAssertEqualObjects(GTSExternalRead(app, @"SyntheticSchemeKey"), @"light",
     @"if this changes, base gained stronger semantics; update docs");
 }
 

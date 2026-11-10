@@ -75,6 +75,8 @@ typedef enum {
   NSDictionary   *_dependsOn;
   NSArray        *_overlaps;
   BOOL            _unstable;
+  NSNumber       *_minimum, *_maximum;
+  NSArray        *_unsupportedFeatures;
 }
 /* Returns nil and appends to problems if the descriptor is invalid. */
 + (id) descriptorWithPropertyList: (NSDictionary*)plist
@@ -99,6 +101,12 @@ typedef enum {
 - (NSDictionary*) dependsOn;
 - (NSArray*) overlaps;
 - (BOOL) isUnstable;
+- (NSNumber*) minimum;               /* number settings, may be nil */
+- (NSNumber*) maximum;
+/* RequiredFeatures this reader does not implement. A setting with any is
+   shown read-only: its semantics are not fully understood. */
+- (NSArray*) unsupportedFeatures;
+- (BOOL) isReadOnly;
 
 /* nil if value may be stored for this setting, else a message. */
 - (NSString*) problemWithValue: (id)value;
@@ -115,8 +123,8 @@ typedef enum {
   NSString     *_bundlePath;
   NSInteger     _version;
   NSString     *_theme;
-  NSString     *_providerIdentifier;
-  NSString     *_providerVersion;
+  NSString     *_themeIdentifier;
+  NSArray      *_unsupportedFeatures;
   NSArray      *_groups;
   NSArray      *_settings;
   NSArray      *_warnings;
@@ -132,8 +140,16 @@ typedef enum {
 - (NSString*) bundlePath;
 - (NSInteger) version;
 - (NSString*) theme;
-- (NSString*) providerIdentifier;
-- (NSString*) providerVersion;
+/* Logical theme identity (reverse DNS) declared by the theme. It names the
+   theme, not an installation: forks and copies may share it. Package and
+   artifact identity come from the bundle (see GTSThemeRecord). */
+- (NSString*) themeIdentifier;
+/* Top-level RequiredFeatures this reader does not implement; when non-empty
+   every setting of this theme is read-only. */
+- (NSArray*) unsupportedFeatures;
+- (BOOL) isReadOnly;
+/* Features this reader implements (RequiredFeatures values). */
++ (NSArray*) supportedFeatures;
 - (NSArray*) groups;
 - (NSArray*) settings;            /* GTSSettingDescriptor, file order */
 - (NSArray*) publicSettings;      /* excludes Status = unstable */

@@ -64,14 +64,10 @@ resolve(GTSSettingDescriptor *s, NSDictionary *global, NSDictionary *app, NSDict
       NSString *src = [[[GTSExamplesDir() stringByAppendingPathComponent: example]
         stringByAppendingPathExtension: @"theme"] stringByAppendingPathComponent: @"Resources/ThemeSettings.plist"];
       NSMutableDictionary *pl = [[[[NSString stringWithContentsOfFile: src] propertyList] mutableCopy] autorelease];
-      if (version)
-        [pl setObject: [NSDictionary dictionaryWithObjectsAndKeys:
-          [[pl objectForKey: @"Provider"] objectForKey: @"Identifier"], @"Identifier",
-          version, @"Version", nil] forKey: @"Provider"];
       [pl writeToFile: [res stringByAppendingPathComponent: @"ThemeSettings.plist"] atomically: YES];
     }
   [[NSDictionary dictionaryWithObjectsAndKeys: [@"org.example.theme." stringByAppendingString: name],
-     @"CFBundleIdentifier", @"7", @"CFBundleVersion", nil]
+     @"CFBundleIdentifier", (version ? version : @"7"), @"CFBundleVersion", nil]
     writeToFile: [res stringByAppendingPathComponent: @"Info-gnustep.plist"] atomically: YES];
   return b;
 }
@@ -102,10 +98,16 @@ resolve(GTSSettingDescriptor *s, NSDictionary *global, NSDictionary *app, NSDict
   GTSThemeCatalog *c = [self catalog];
   GTSThemeRecord *a = [c themeNamed: @"Adwaita"];
   XCTAssertEqualObjects([a origin], GTSOriginUser);
-  XCTAssertEqualObjects([a providerVersion], @"user-copy");
+  XCTAssertEqualObjects([a bundleVersion], @"user-copy");
+  XCTAssertEqualObjects([a themeIdentifier], @"org.gnustep.themes.adwaita");
   XCTAssertEqual([[a shadowedRecords] count], (NSUInteger)1);
-  XCTAssertEqualObjects([[[a shadowedRecords] lastObject] providerVersion], @"bundled");
-  XCTAssertEqualObjects([[[a shadowedRecords] lastObject] origin], GTSOriginSystem);
+  {
+    GTSThemeRecord *sh = [[a shadowedRecords] lastObject];
+    XCTAssertEqualObjects([sh bundleVersion], @"bundled");
+    XCTAssertEqualObjects([sh origin], GTSOriginSystem);
+    XCTAssertEqualObjects([sh themeIdentifier], [a themeIdentifier], @"same logical theme ...");
+    XCTAssertFalse([[a fingerprint] isEqual: [sh fingerprint]], @"... but distinct installed artifacts");
+  }
   XCTAssertEqualObjects([[c themes] valueForKey: @"name"], ([NSArray arrayWithObjects:
     @"Adwaita", @"Broken", @"Gumdrop", @"NoMeta", nil]));
 }
@@ -117,7 +119,9 @@ resolve(GTSSettingDescriptor *s, NSDictionary *global, NSDictionary *app, NSDict
   XCTAssertTrue([n isAvailable]);
   XCTAssertNil([n schema]);
   XCTAssertNil([n schemaError], @"no file is not an error");
-  XCTAssertEqualObjects([n providerIdentifier], @"org.example.theme.NoMeta", @"falls back to bundle id");
+  XCTAssertEqualObjects([n bundleIdentifier], @"org.example.theme.NoMeta");
+  XCTAssertNil([n themeIdentifier], @"no logical id is invented from the bundle id");
+  XCTAssertNotNil([n fingerprint]);
   XCTAssertNil([b schema]);
   XCTAssertEqual([[b schemaError] code], (NSInteger)GTSErrorUnsupportedVersion);
 }
@@ -173,21 +177,21 @@ resolve(GTSSettingDescriptor *s, NSDictionary *global, NSDictionary *app, NSDict
 - (void) testAdwaitaInfoNoBeatsGlobalYes
 {
   GTSSettingDescriptor *s = setting(@"Adwaita", @"adwaita.header-bar-toolbar");
-  GTSResolvedValue *v = resolve(s, D(@"YES", @"AdwaitaHeaderBarToolbar", nil), D(nil),
-    D(@"NO", @"AdwaitaHeaderBarToolbar", nil));
+  GTSResolvedValue *v = resolve(s, D(@"YES", @"GnomeThemeHeaderBarToolbar", nil), D(nil),
+    D(@"NO", @"GnomeThemeHeaderBarToolbar", nil));
   XCTAssertEqual([v state], GTSValueInfoPlist);
   XCTAssertEqualObjects([v effectiveValue], @"NO");
 
-  v = resolve(s, D(@"NO", @"AdwaitaHeaderBarToolbar", nil), D(nil),
-    D(@"YES", @"AdwaitaHeaderBarToolbar", nil));
+  v = resolve(s, D(@"NO", @"GnomeThemeHeaderBarToolbar", nil), D(nil),
+    D(@"YES", @"GnomeThemeHeaderBarToolbar", nil));
   XCTAssertEqual([v state], GTSValueInherited, @"Info YES does not beat global");
 
-  v = resolve(s, D(@"YES", @"AdwaitaHeaderBarToolbar", nil), D(@"YES", @"AdwaitaHeaderBarToolbar", nil),
-    D(@"NO", @"AdwaitaHeaderBarToolbar", nil));
+  v = resolve(s, D(@"YES", @"GnomeThemeHeaderBarToolbar", nil), D(@"YES", @"GnomeThemeHeaderBarToolbar", nil),
+    D(@"NO", @"GnomeThemeHeaderBarToolbar", nil));
   XCTAssertEqual([v state], GTSValueExplicit, @"app override wins over Info");
 
   /* Editing global: Info.plist of no app applies. */
-  v = resolve(s, D(@"YES", @"AdwaitaHeaderBarToolbar", nil), nil, nil);
+  v = resolve(s, D(@"YES", @"GnomeThemeHeaderBarToolbar", nil), nil, nil);
   XCTAssertEqual([v state], GTSValueExplicit);
 }
 
@@ -199,7 +203,7 @@ resolve(GTSSettingDescriptor *s, NSDictionary *global, NSDictionary *app, NSDict
   XCTAssertNil([v effectiveValue]);
   XCTAssertNotNil([v note]);
 
-  v = resolve(s, D(nil), D(@"default", @"AdwaitaColorScheme", nil), nil);
+  v = resolve(s, D(nil), D(@"default", @"GnomeThemeColorScheme", nil), nil);
   XCTAssertEqual([v state], GTSValueExplicit);
   XCTAssertEqualObjects([v effectiveValue], @"default");
 }
@@ -207,18 +211,29 @@ resolve(GTSSettingDescriptor *s, NSDictionary *global, NSDictionary *app, NSDict
 - (void) testWinUIMenuStyleCustomPrecedence
 {
   GTSSettingDescriptor *s = setting(@"WinUITheme", @"winui.menu-style");
-  GTSResolvedValue *v = resolve(s, D(@"window", @"WinUIMenuStyle", nil), D(nil),
-    D(@"menubar", @"WinUIMenuStyle", nil));
+  GTSResolvedValue *v = resolve(s, D(@"more", @"WinUIThemeMenuStyle", nil), D(nil),
+    D(@"menubar", @"WinUIThemeMenuStyle", nil));
   XCTAssertEqual([v state], GTSValueInfoPlist, @"Info menubar outranks global");
 
-  v = resolve(s, D(@"menubar", @"WinUIMenuStyle", nil), D(nil),
-    D(@"window", @"WinUIMenuStyle", nil));
-  XCTAssertEqual([v state], GTSValueInherited, @"Info window does not outrank global");
+  v = resolve(s, D(@"menubar", @"WinUIThemeMenuStyle", nil), D(nil),
+    D(@"more", @"WinUIThemeMenuStyle", nil));
+  XCTAssertEqual([v state], GTSValueInherited, @"Info 'more' ranks below global");
+
+  v = resolve(s, D(nil), D(nil), D(@"more", @"WinUIThemeMenuStyle", nil));
+  XCTAssertEqual([v state], GTSValueInfoPlist);
+  XCTAssertEqualObjects([v effectiveValue], @"more");
 
   v = resolve(s, D(nil), D(nil), nil);
   XCTAssertEqual([v state], GTSValueDefault);
-  XCTAssertEqualObjects([v caveats], ([NSArray arrayWithObjects: GTSSourceArgument, GTSSourceOtherInfo, nil]),
-    @"another bundle's Info.plist could still decide it at runtime");
+  XCTAssertEqualObjects([v effectiveValue], @"menubar");
+}
+
+- (void) testGumdropInvalidInfoValueEndsAsPrimary
+{
+  GTSResolvedValue *v = resolve(setting(@"Gumdrop", @"gumdrop.menu-style"), D(nil), D(nil),
+    D(@"sideways", @"GumdropMenuStyle", nil));
+  XCTAssertEqual([v state], GTSValueDefault);
+  XCTAssertEqualObjects([v effectiveValue], @"primary");
 }
 
 - (void) testThemeSelectionIndependentOfSettings
@@ -226,7 +241,7 @@ resolve(GTSSettingDescriptor *s, NSDictionary *global, NSDictionary *app, NSDict
   GTSSettingsResolver *r;
   GTSResolvedValue *v;
   r = [[[GTSSettingsResolver alloc] initWithGlobal: snap(NSGlobalDomain, D(@"WinUITheme", @"GSTheme", nil))
-    application: snap(@"a", D(@"dark", @"AdwaitaColorScheme", nil)) applicationInfo: nil] autorelease];
+    application: snap(@"a", D(@"dark", @"GnomeThemeColorScheme", nil)) applicationInfo: nil] autorelease];
   v = [r resolveThemeSelection];
   XCTAssertEqual([v state], GTSValueInherited);
   XCTAssertEqualObjects([v effectiveValue], @"WinUITheme");

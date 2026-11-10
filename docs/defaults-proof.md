@@ -5,8 +5,12 @@ gnustep-make 2.9.3, GCC libobjc, tools-xctest (~/GNUstep). Not yet repeated on
 the shared base 6479d4483 / gui 9bd1123a1.
 
 Run: `scripts/run-tests.sh` (creates a 0700 scratch root, 0600 config files,
-sets `GNUSTEP_CONFIG_FILE`, aborts if `GSDefaultsRootForUser()` is not under
-it). External reads/writes go through `/usr/bin/defaults` as a separate
+sets `GNUSTEP_CONFIG_FILE`; checks the master config is readable; builds a
+read-only probe with the same gnustep-base as `/usr/bin/defaults` and refuses
+unless the probe resolves the defaults root inside the scratch root; runs
+xctest in its own process group so cleanup reaps every child before deleting
+the scratch config). Each test process repeats the containment check with
+symlink-resolved path components before any write. External reads/writes go through `/usr/bin/defaults` as a separate
 process. Result: all tests pass (48 at 2026-11-10 late morning), stable over
 repeated runs. Self-run only; not yet independently reviewed.
 
@@ -17,9 +21,12 @@ repeated runs. Self-run only; not yet independently reviewed.
    copy of `GNUstep.conf` named by `GNUSTEP_CONFIG_FILE`, with absolute
    `GNUSTEP_USER_CONFIG_FILE` and `GNUSTEP_USER_DEFAULTS_DIR`, isolates
    correctly.
-2. **Foreign domains are cached forever.** Once an `NSUserDefaults` instance
-   has loaded a domain that is not in its search list, `-synchronize` never
-   reloads it (still stale seconds later). A fresh `-initWithUser:` instance +
+2. **Foreign domains stayed stale.** On base 1.31.1, once an
+   `NSUserDefaults` instance had loaded a domain that is not in its search
+   list, it kept returning the old values under the refresh paths tried
+   (`-synchronize`, then re-read immediately and after ~1 s, several
+   iterations). This is a finite experiment on one version, not a guarantee
+   about every refresh path. A fresh `-initWithUser:` instance +
    `-synchronize` always sees disk. Adding the domain as a suite also refreshes
    it, but would change the editor's own search list. **Decision:** the store
    uses a dedicated fresh instance per snapshot and per commit.
@@ -34,7 +41,14 @@ repeated runs. Self-run only; not yet independently reviewed.
    `testResidualRaceSameKeyLastWriterWins` pins this behaviour.
 5. Reset removes exactly one key; unrelated keys and values for inactive themes
    are untouched (tests in `GTSDefaultsDomainStoreTests`, `GTSEditSessionTests`).
-6. "All-or-nothing" applies only to conflicts **observed before commit**: if
+6. **Unreadable or damaged domains look empty.** With a domain file at mode
+   000, or containing a truncated plist, base 1.31.1 returned an empty domain
+   and `-synchronize` returned YES; an unreadable defaults directory looked
+   exactly like an absent domain. A write on top would have replaced the
+   file. The store therefore checks the file backend itself and fails closed
+   (`GTSStoreFailureTests`). This check knows GNUstep's file layout
+   (`<defaults root>/<domain>.plist`); a different backend needs its own.
+7. "All-or-nothing" applies only to conflicts **observed before commit**: if
    any staged key moved since the baseline, nothing is written. Once the check
    passes, the write is a normal GNUstep `-synchronize`, not a transaction.
 
@@ -47,9 +61,10 @@ remains the safety criterion.
 ## Limits
 
 * The in-app pane's own `standardUserDefaults` may serve stale values for
-  domains it loaded earlier. After a commit it is sent `-synchronize`, which is
-  enough for its own domain (in its search list), but live-apply still needs
-  proof in a GUI run.
+  domains it loaded earlier. After a commit it is sent `-synchronize`; whether
+  that makes the app's own domain current (and fires
+  `NSUserDefaultsDidChangeNotification` for live settings) is UNPROVEN until a
+  GUI test shows it.
 * Distributed notifications are not posted; running apps learn about changes
   on restart, or through live mechanisms a theme declares (`Apply = live`).
 * Only Linux/base 1.31.1 so far. Windows (registry-backed defaults?) and macOS

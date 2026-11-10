@@ -1,53 +1,96 @@
-/* Adwaita - semantics from owner reports #20389/#20402 at 09e7c6a.
-   KEY NAMES ARE PLACEHOLDERS until the adwaita owner sends the 9-key inventory. */
+/* Adwaita - DRAFT for the adwaita owner's review (they own this file).
+   Keys and semantics from owner inventory msg #20842 at
+   danjboyd/plugins-themes-Adwaita 09e7c6a (paths under Source/).
+   Not compatibility evidence until the owner approves it. */
 {
   SchemaVersion = 1;
   Theme = Adwaita;
-  Provider = { Identifier = "org.gnustep.themes.adwaita"; Version = "09e7c6a"; };
-  Groups = ( { Identifier = appearance; Title = "Appearance"; },
-             { Identifier = layout; Title = "Layout"; } );
+  ThemeIdentifier = "org.gnustep.themes.adwaita";
+  Groups = (
+    { Identifier = appearance; Title = "Appearance"; },
+    { Identifier = layout; Title = "Layout"; },
+    { Identifier = integration; Title = "GNOME integration"; }
+  );
   Settings = (
-    {
-      Identifier = "adwaita.color-scheme";
-      Key = AdwaitaColorScheme;            /* TBC */
-      Type = enum;
+    { /* Settings/GnomeThemeSettings.m:105-147 */
+      Identifier = "adwaita.color-scheme"; Key = GnomeThemeColorScheme; Type = enum; CaseInsensitive = YES;
       Values = (
-        { Value = default; Title = "Default (light)"; Help = "Stored explicitly; ignores GTK_THEME."; },
-        { Value = light; Title = "Light"; },
-        { Value = dark; Title = "Dark"; }
+        { Value = "force-light"; Title = "Light"; },
+        { Value = "force-dark"; Title = "Dark"; },
+        { Value = default; Title = "GNOME setting only"; Help = "Follows GNOME's colour scheme and ignores GTK_THEME."; }
       );
-      Scopes = ( global, application );
-      Group = appearance;
-      Title = "Color scheme";
-      Unset = { Behavior = dynamic; Help = "Follows GTK_THEME, then the GNOME color-scheme setting."; };
-      Apply = restart;                     /* TBC: live? */
+      Scopes = ( global, application ); Group = appearance;
+      Title = "Style"; Help = "Light or dark for this app, or follow the system.";
+      Unset = { Behavior = dynamic; Help = "GTK_THEME's variant if set, else GNOME's colour scheme"; };
+      Apply = restart;
     },
-    {
-      Identifier = "adwaita.metrics";
-      Key = AdwaitaMetrics;                /* TBC */
-      Type = enum;
+    { /* GnomeThemeSettings.m:419-427; Rendering/GnomeThemePalette.m:327-337 */
+      Identifier = "adwaita.accent-color"; Key = GnomeThemeAccentColor; Type = enum; CaseInsensitive = YES;
+      Values = ( { Value = blue; Title = "Blue"; }, { Value = teal; Title = "Teal"; }, { Value = green; Title = "Green"; },
+                 { Value = yellow; Title = "Yellow"; }, { Value = orange; Title = "Orange"; }, { Value = red; Title = "Red"; },
+                 { Value = pink; Title = "Pink"; }, { Value = purple; Title = "Purple"; }, { Value = slate; Title = "Slate"; } );
+      Scopes = ( global, application ); Group = appearance;
+      Title = "Accent colour"; Help = "Highlight colour for selections, switches and default buttons.";
+      Unset = { Behavior = dynamic; Help = "GNOME's accent colour, else blue"; };
+      Apply = restart;
+    },
+    { /* GnomeThemeSettings.m:38-80. A stored "auto" skips the Info.plist fallback. */
+      Identifier = "adwaita.metrics"; Key = GnomeThemeMetrics; Type = enum; CaseInsensitive = YES;
       Values = (
-        { Value = auto; Title = "Automatic"; Help = "Stored explicitly; skips the app's Info.plist value."; },
-        { Value = compact; Title = "Compact"; },     /* TBC */
-        { Value = regular; Title = "Regular"; }      /* TBC */
+        { Value = gnome; Title = "GNOME sizes"; },
+        { Value = compact; Title = "Compact (GNUstep sizes)"; },
+        { Value = auto; Title = "Automatic"; Help = "Compact for apps laid out in Gorm/nib; ignores the app's own preference."; }
       );
-      Scopes = ( global, application );
-      Group = layout;
-      Title = "Metrics";
-      Unset = { Behavior = dynamic; Help = "Uses the app's Info.plist value if any, else automatic."; };
+      Scopes = ( global, application ); Group = layout;
+      Title = "Control sizes"; Help = "GNOME's sizes, GNUstep's compact sizes, or automatic for apps laid out in Gorm.";
+      Unset = { Behavior = dynamic; Help = "the app's own preference, else automatic"; };
       Precedence = ( argument, application, global, applicationInfo );
       Apply = restart;
     },
-    {
-      Identifier = "adwaita.header-bar-toolbar";
-      Key = AdwaitaHeaderBarToolbar;       /* TBC */
-      Type = bool;
-      Scopes = ( global, application );
-      Group = layout;
-      Title = "Merge toolbar into header bar";
-      Unset = { Behavior = static; Value = YES; };   /* TBC */
-      /* app/args win; an Info.plist NO beats a global YES. */
+    { /* Rendering/GnomeThemePrimaryMenu.m:72-85. Only "menubar" is recognised; anything else is primary. */
+      Identifier = "adwaita.menu-style"; Key = GnomeThemeMenuStyle; Type = enum; CaseInsensitive = YES;
+      Values = ( { Value = primary; Title = "Main menu button"; }, { Value = menubar; Title = "Menu bar"; } );
+      Scopes = ( global, application ); Group = layout;
+      Title = "Menus"; Help = "GNOME's main menu button, or a menu bar.";
+      Unset = { Behavior = static; Value = primary; };
+      Precedence = ( argument, application, global, { Source = applicationInfo; Values = ( menubar ); } );
+      Apply = restart;
+    },
+    { /* Rendering/GnomeThemeHeaderBar.m:160-213; live via NSUserDefaultsDidChange, GnomeTheme.m:481 */
+      Identifier = "adwaita.header-bar-toolbar"; Key = GnomeThemeHeaderBarToolbar; Type = bool;
+      Scopes = ( global, application ); Group = layout;
+      Title = "Toolbar in header bar";
+      Help = "Put the window's toolbar buttons in the title bar row. Only when GNUstep draws the window decorations; open windows keep their size.";
+      Unset = { Behavior = static; Value = NO; };
       Precedence = ( argument, application, { Source = applicationInfo; Values = ( NO ); }, global, applicationInfo );
+      Apply = live;
+    },
+    { /* Rendering/GnomeThemeOverlayScrollers.m:57-70 */
+      Identifier = "adwaita.overlay-scrollbars"; Key = GnomeThemeOverlayScrollbars; Type = bool;
+      Scopes = ( global, application ); Group = appearance;
+      Title = "Overlay scrollbars"; Help = "Scrollbars that appear over the content only while scrolling.";
+      Unset = { Behavior = dynamic; Help = "GNOME's overlay-scrolling setting"; };
+      Apply = newWindows;
+    },
+    { /* Adapters/GnomeThemeFileChooser.m:49, 545-549 */
+      Identifier = "adwaita.native-file-dialogs"; Key = GnomeThemeNativeFileDialogs; Type = bool;
+      Scopes = ( global, application ); Group = integration;
+      Title = "GNOME file chooser"; Help = "Use GNOME's file chooser for open and save.";
+      Unset = { Behavior = static; Value = YES; };
+      Apply = newWindows;
+    },
+    { /* Adapters/GnomeThemePrintDialog.m:57, 540-544 */
+      Identifier = "adwaita.native-print-dialog"; Key = GnomeThemeNativePrintDialog; Type = bool;
+      Scopes = ( global, application ); Group = integration;
+      Title = "GNOME print dialog"; Help = "Use GNOME's print dialog.";
+      Unset = { Behavior = static; Value = YES; };
+      Apply = newWindows;
+    },
+    { /* Settings/GnomeThemeSettings.m:83-100. Out of range or not a number acts as 1.0. */
+      Identifier = "adwaita.font-scale"; Key = GnomeFontScale; Type = number; Minimum = 0.8; Maximum = 2.0;
+      Scopes = ( global, application ); Group = appearance;
+      Title = "Text size"; Help = "Scale the interface font (GNOME's Large Text applies on top).";
+      Unset = { Behavior = static; Value = 1.0; };
       Apply = restart;
     }
   );

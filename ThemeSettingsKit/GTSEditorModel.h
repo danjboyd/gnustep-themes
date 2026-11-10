@@ -30,6 +30,7 @@
   BOOL _canReset;
   BOOL _isFreeForm;      /* string/number: text field instead of choices */
   NSString *_text;
+  BOOL _readOnly;        /* metadata requires features this editor lacks */
 }
 - (GTSSettingDescriptor*) setting;
 - (NSString*) title;
@@ -40,6 +41,7 @@
 - (BOOL) canReset;
 - (BOOL) isFreeForm;
 - (NSString*) text;
+- (BOOL) isReadOnly;
 @end
 
 @interface GTSEditorModel : NSObject
