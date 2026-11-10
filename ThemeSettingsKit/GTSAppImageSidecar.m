@@ -350,10 +350,10 @@ isHex64(NSString *s)
         return @"This package does not set a default theme.";
       case GTSSeedAbsentWillApply:
         return [NSString stringWithFormat: @"Packaged default %@ will be set again the next time "
-          @"the app starts. To use another theme, choose it.", seed];
+          @"the app starts.", seed];
       case GTSSeedInEffect:
         return [NSString stringWithFormat: @"Packaged default (%@). Removing it has no lasting effect: "
-          @"the app sets it again at each launch. Choose another theme instead.", seed];
+          @"the app sets it again at each launch.", seed];
       case GTSSeedOverriddenByUser:
         return [NSString stringWithFormat: @"Chosen for this app; it stays. If it is removed, "
           @"the packaged default %@ comes back at the next launch.", seed];

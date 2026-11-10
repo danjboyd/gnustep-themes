@@ -134,7 +134,7 @@
   [self setMessage: nil];
   /* Values only when the metadata is known to describe this AppImage and
      names the domain the app reads. Reading only; no session. */
-  if (_binding == GTSSidecarBound && domain != nil)
+  if (_binding == GTSSidecarBound && domain != nil)   /* local snapshot, labelled as such */
     {
       ASSIGN(_globalBaseline, [_store snapshotForDomain: NSGlobalDomain error: &err]);
       if (_globalBaseline != nil)
@@ -147,14 +147,16 @@
 
 /* Name of the theme the AppImage app will use, as far as the app domain
    and the recognised seed policy tell; nil when not known. */
+/* Theme whose settings are listed: the package's default (recognised
+   policy), else the theme in this editor's store. A listing choice, not a
+   claim about what the running AppImage uses. */
 - (NSString*) appImageThemeName
 {
-  id stored = [_roApp objectForKey: @"GSTheme"];
   if (_roApp == nil) return nil;
-  if (stored != nil) return stored;
-  if ([_sidecar seededThemeStateForStoredValue: nil inDomain: [_roApp domainName]] == GTSSeedAbsentWillApply)
+  if ([[_sidecar seedPolicy] isEqual: @"each-launch-if-absent"]
+    && [[_sidecar seedDomain] isEqual: [_roApp domainName]])
     return [_sidecar seededTheme];
-  return nil;
+  return [_roApp objectForKey: @"GSTheme"];
 }
 
 - (GTSThemeSettingsSchema*) currentSchema
@@ -229,11 +231,9 @@ stateText(GTSResolvedValue *v, BOOL global)
     {
       /* One read-only entry describing what is stored. No "same as all
          applications" choice: for a seeded theme removal is not lasting. */
-      NSString *name = [self appImageThemeName];
-      NSString *title = name ? name : @"Not known";
-      if (name != nil && [_roApp objectForKey: @"GSTheme"] == nil)
-        title = [NSString stringWithFormat: @"%@ (packaged default)", name];
-      return [NSArray arrayWithObject: [GTSChoice choiceWithTitle: title value: name]];
+      /* Whether the AppImage reads this editor's settings store is unknown,
+         so its current theme is never presented as known. */
+      return [NSArray arrayWithObject: [GTSChoice choiceWithTitle: @"Not known for the running AppImage" value: nil]];
     }
   if (_session == nil)   /* nothing known: never present a guess as current */
     return [NSArray arrayWithObject: [GTSChoice choiceWithTitle: @"Unknown (settings could not be read)" value: nil]];
@@ -277,10 +277,26 @@ stateText(GTSResolvedValue *v, BOOL global)
 {
   if (_sidecar != nil)
     {
-      if (_roApp == nil) return @"Not available";
-      return [_sidecar descriptionOfSeededThemeState:
-        [_sidecar seededThemeStateForStoredValue: [_roApp objectForKey: @"GSTheme"]
-                                        inDomain: [_roApp domainName]]];
+      NSMutableArray *lines = [NSMutableArray array];
+      NSString *seed = [_sidecar seededTheme];
+      id local = [_roApp objectForKey: @"GSTheme"];
+      /* 1. What the package says (prediction, independent of any store). */
+      if (seed == nil)
+        [lines addObject: @"Package: sets no default theme."];
+      else if ([_sidecar runtimeDomainHint] != nil && ![[_sidecar seedDomain] isEqual: [_sidecar runtimeDomainHint]])
+        [lines addObject: [NSString stringWithFormat: @"Package default %@ is written to %@, not the domain "
+          @"the app reads; it may not apply.", seed, [_sidecar seedDomain]]];
+      else if ([[_sidecar seedPolicy] isEqual: @"each-launch-if-absent"])
+        [lines addObject: [NSString stringWithFormat: @"Package default: %@, written by the AppImage at "
+          @"each launch when its settings have no theme.", seed]];
+      else
+        [lines addObject: [NSString stringWithFormat: @"Package mentions default %@; how it is applied is unknown.", seed]];
+      /* 2. What THIS editor's store holds (not confirmed to be the AppImage's). */
+      if (_roApp != nil)
+        [lines addObject: [NSString stringWithFormat: @"This editor's settings store: theme %@.",
+          local ? local : @"not set"]];
+      [lines addObject: @"This view cannot change settings."];
+      return [lines componentsJoinedByString: @"\n"];
     }
   if (_session == nil) return @"Not available";
   return stateText([[self resolver] resolveThemeSelection], [self targetIsGlobal]);
@@ -338,6 +354,7 @@ stateText(GTSResolvedValue *v, BOOL global)
     @"settings not available (outside the AppImage or a link loop)", @"settings status not understood" };
 
   [p addObject: [GTSAppImageSidecar descriptionOfBinding: _binding]];
+  [p addObject: @"This view cannot change settings."];
   if (_binding != GTSSidecarBound)
     {
       [p addObject: @"Nothing below is shown as current until the theme information matches the AppImage."];
@@ -346,15 +363,20 @@ stateText(GTSResolvedValue *v, BOOL global)
   if ([_sidecar runtimeDomainHint] == nil)
     [p addObject: @"The app's settings domain is not known, so its current settings can't be shown."];
   else
-    [p addObject: [NSString stringWithFormat: @"Settings domain %@ (from the app's %@).",
-      [_sidecar runtimeDomainHint], [src isEqual: @"bundleIdentifier"] ? @"bundle identifier" : @"process name"]];
+    {
+      [p addObject: [NSString stringWithFormat: @"Settings domain %@ (from the app's %@).",
+        [_sidecar runtimeDomainHint], [src isEqual: @"bundleIdentifier"] ? @"bundle identifier" : @"process name"]];
+      [p addObject: [NSString stringWithFormat: @"Values below come from THIS editor's settings store (%@). "
+        @"The AppImage's own GNUstep configuration may use a different store, so they are not "
+        @"confirmed as the AppImage's current settings.", [GTSDefaultsDomainStore defaultsRoot]]];
+    }
   if (match != nil && ![match boolValue])
     [p addObject: [NSString stringWithFormat: @"Warning: the package sets its default theme in %@, "
       @"not in the domain the app reads.", [_sidecar seedDomain]]];
   if (name != nil && t == nil)
     [p addObject: [NSString stringWithFormat: @"%@ is not bundled in this AppImage; it may come from your own Library.", name]];
   else if (t != nil)
-    [p addObject: [NSString stringWithFormat: @"Bundled theme %@: %@.", name, statusText[[t settingsStatus]]]];
+    [p addObject: [NSString stringWithFormat: @"Settings listed for %@: %@.", name, statusText[[t settingsStatus]]]];
   [p addObject: @"Whether bundled theme code matches this system's GNUstep is not known."];
   if ([[_sidecar warnings] count] > 0)
     [p addObject: [NSString stringWithFormat: @"Theme information warnings: %@",
@@ -425,10 +447,12 @@ stateText(GTSResolvedValue *v, BOOL global)
       row = [[[GTSSettingRow alloc] init] autorelease];
       row->_setting = [s retain];
       row->_title = [[sc localizedString: [s title]] copy];
-      row->_stateText = [stateText(v, [self targetIsGlobal]) copy];
+      row->_stateText = [(_sidecar != nil
+        ? [NSString stringWithFormat: @"In this editor's store: %@", [stateText(v, NO) lowercaseString]]
+        : stateText(v, [self targetIsGlobal])) copy];
       row->_readOnly = [s isReadOnly] || [sc isReadOnly] || _sidecar != nil;
       if (_sidecar != nil)
-        [notes addObject: @"Shown read-only: AppImage settings are not edited here."];
+        [notes addObject: @"This view cannot change settings."];
       row->_canReset = [v hasOverride] && !row->_readOnly;
       if ([s isReadOnly])
         [notes addObject: [NSString stringWithFormat: @"Read-only: needs %@.",

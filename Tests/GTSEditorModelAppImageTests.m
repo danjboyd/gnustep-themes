@@ -86,21 +86,26 @@
   XCTAssertTrue([model setTargetAppImageSidecar: [self sidecar] appImage: nil]);
   XCTAssertTrue([model targetIsAppImage]);
   XCTAssertTrue([[model targetTitle] hasSuffix: @"(AppImage, read-only)"]);
-  /* GSTheme absent: packaged default applies at the next launch. */
-  XCTAssertEqualObjects([[[model themeChoices] lastObject] title], @"Gumdrop (packaged default)");
-  XCTAssertTrue([[model themeStateText] rangeOfString: @"next time"].location != NSNotFound, @"%@", [model themeStateText]);
+  /* The running AppImage's theme is never presented as known; the package's
+     prediction and this editor's local snapshot are separate lines. */
+  XCTAssertEqualObjects([[[model themeChoices] lastObject] title], @"Not known for the running AppImage");
+  XCTAssertTrue([[model themeStateText] rangeOfString: @"Package default: Gumdrop"].location != NSNotFound, @"%@", [model themeStateText]);
+  XCTAssertTrue([[model themeStateText] rangeOfString: @"This editor's settings store: theme not set"].location != NSNotFound);
+  XCTAssertTrue([[model themeStateText] rangeOfString: @"cannot change settings"].location != NSNotFound);
+  XCTAssertTrue([[model themeNote] rangeOfString: @"not confirmed as the AppImage's current settings"].location != NSNotFound);
   XCTAssertTrue([[model themeNote] rangeOfString: @"matches this AppImage"].location != NSNotFound);
   XCTAssertTrue([[model themeNote] rangeOfString: @"is not known"].location != NSNotFound, @"compatibility unknown");
   XCTAssertEqual([[model rows] count], (NSUInteger)1);
-  XCTAssertEqualObjects([[[model rows] lastObject] stateText], @"Set for this application");
+  XCTAssertEqualObjects([[[model rows] lastObject] stateText], @"In this editor's store: set for this application");
   [self assertNothingEditable];
   XCTAssertEqualObjects(GTSExternalRead(domain, @"GumdropMenuStyle"), @"menubar", @"nothing written");
 
-  /* After a launch wrote the seed: in effect, removal not lasting. */
+  /* A GSTheme in this editor's store is reported as local only. */
   GTSMustRunDefaults([NSArray arrayWithObjects: @"write", domain, @"GSTheme", @"Gumdrop", nil]);
   [model setTargetAppImageSidecar: [self sidecar] appImage: nil];
-  XCTAssertEqualObjects([[[model themeChoices] lastObject] title], @"Gumdrop");
-  XCTAssertTrue([[model themeStateText] rangeOfString: @"each launch"].location != NSNotFound);
+  XCTAssertTrue([[model themeStateText] rangeOfString: @"This editor's settings store: theme Gumdrop"].location != NSNotFound);
+  XCTAssertEqualObjects([[[model themeChoices] lastObject] title], @"Not known for the running AppImage",
+    @"a local value is still not the AppImage's confirmed state");
 }
 
 - (void) testMissingArtifactShowsNoValues
@@ -110,7 +115,7 @@
   XCTAssertFalse([model setTargetAppImageSidecar: [self sidecar] appImage: nil]);
   XCTAssertTrue([[model themeNote] rangeOfString: @"is not there"].location != NSNotFound, @"%@", [model themeNote]);
   XCTAssertEqual([[model rows] count], (NSUInteger)0);
-  XCTAssertEqualObjects([[[model themeChoices] lastObject] title], @"Not known");
+  XCTAssertEqualObjects([[[model themeChoices] lastObject] title], @"Not known for the running AppImage");
   [self assertNothingEditable];
 }
 
@@ -122,7 +127,7 @@
   XCTAssertFalse([model setTargetAppImageSidecar: [self sidecar] appImage: nil]);
   XCTAssertTrue([[model themeNote] rangeOfString: @"has changed"].location != NSNotFound);
   XCTAssertEqual([[model rows] count], (NSUInteger)0, @"stale metadata is not used for values");
-  XCTAssertEqualObjects([[[model themeChoices] lastObject] title], @"Not known");
+  XCTAssertEqualObjects([[[model themeChoices] lastObject] title], @"Not known for the running AppImage");
   [self assertNothingEditable];
 }
 
@@ -133,7 +138,9 @@
   XCTAssertTrue([[model themeNote] rangeOfString: @"not in the domain the app reads"].location != NSNotFound,
     @"%@", [model themeNote]);
   XCTAssertTrue([[model themeStateText] rangeOfString: @"may not apply"].location != NSNotFound, @"%@", [model themeStateText]);
-  XCTAssertEqualObjects([[[model themeChoices] lastObject] title], @"Not known", @"no theme promised for the app");
+  XCTAssertTrue([[model themeStateText] rangeOfString: @"written by the AppImage at each launch"].location == NSNotFound,
+    @"no each-launch promise for a seed in the wrong domain");
+  XCTAssertEqualObjects([[[model themeChoices] lastObject] title], @"Not known for the running AppImage");
   [self assertNothingEditable];
 }
 
