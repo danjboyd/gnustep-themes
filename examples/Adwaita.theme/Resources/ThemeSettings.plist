@@ -1,8 +1,7 @@
-/* Adwaita - DRAFT for the adwaita owner's review (they own this file).
-   Keys and semantics from owner inventory msg #20842 at
-   danjboyd/plugins-themes-Adwaita 09e7c6a (paths under Source/).
-   Owner-reviewed version is draft PR danjboyd/plugins-themes-Adwaita#138
-   (MenuStyle Unset made dynamic there; mirrored here). */
+/* Adwaita - MIRROR of the owner's file (adwaita owns it). Upstream:
+   danjboyd/plugins-themes-Adwaita main 4c9edba, Resources/ThemeSettings.plist
+   (PR #138 merged from head 2581c19). Same content; formatting and comments
+   differ. Keys and semantics from owner inventory msg #20842. */
 {
   SchemaVersion = 1;
   Theme = Adwaita;

@@ -158,8 +158,9 @@ target.
    changes prompt; GUI test on a private Xvfb with scratch defaults.
 4. Target discovery in the pane process: the same `GTSThemeCatalog` roots as
    the standalone app. User-dir shadowing is shown.
-5. Theme metadata merged by owners: WinUI (#196) is merged; Adwaita (#138)
-   is still a draft; Gumdrop is reviewed but not committed in its repo.
+5. Theme metadata merged by owners: WinUI (#196, main 74f0972) and Adwaita
+   (#138, main 4c9edba; no tag or release yet) are merged. Gumdrop is
+   reviewed but not committed in its repo.
 6. Platform gate as in docs/platforms.md: Linux only until the
    Windows/macOS requirements there are met.
 

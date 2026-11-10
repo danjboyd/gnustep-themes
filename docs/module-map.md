@@ -19,8 +19,8 @@ Later: SystemPreferences module reuses `ThemeSettingsUI` unchanged.
 
 | What | Owner | What we need |
 |---|---|---|
-| Adwaita theme + its `ThemeSettings.plist` | `adwaita` | Full public key inventory (9 keys), owner-verified example semantics. |
-| WinUITheme + metadata | `winuitheme` | Public vs unstable keys; MenuStyle precedence; ColorScheme/PreferDark/PreferLight overlap. |
+| Adwaita theme + its `ThemeSettings.plist` | `adwaita` | Shipped on main: PR #138 merged as 4c9edba (2026-11-10, from head 2581c19; plist sha256 0b236b95..., validator 0/0). No tag or release yet (next alpha). |
+| WinUITheme + metadata | `winuitheme` | Shipped on main: PR #196 merged as 74f0972 (mirror identical). Public vs unstable keys; MenuStyle precedence; ColorScheme/PreferDark/PreferLight overlap. |
 | Gumdrop / fun themes | `fun-themes` | `GumdropMenuStyle` (inventory in #20619); other fun themes pending. |
 | AppImage payload, capability sidecar | `gnustep-packager` | Sidecar proposal: app domain, theme versions/schema/providers, default theme, search-path policy, bound to AppImage hash. |
 | libs-base / libs-gui behaviour | `gnustep` | Domain naming, GSTheme notifications, any upstream changes. |
