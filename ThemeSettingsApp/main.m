@@ -5,6 +5,7 @@
 #import "GTSDefaultsDomainStore.h"
 #import "GTSThemeCatalog.h"
 #import "GTSScreenshot.h"
+#import "GTSScriptRunner.h"
 
 @interface GTSConfigurator : NSObject
 {
@@ -108,7 +109,9 @@
   [_window makeKeyAndOrderFront: self];
 
   shot = [ud stringForKey: @"GTSScreenshot"];
-  if ([shot length] > 0)
+  if ([[ud stringForKey: @"GTSScript"] length] > 0)
+    [GTSScriptRunner runScript: [ud stringForKey: @"GTSScript"] editor: _editor window: _window];
+  else if ([shot length] > 0)
     [self performSelector: @selector(screenshotAndQuit:) withObject: shot afterDelay: 1.5];
 }
 

@@ -89,13 +89,50 @@ echo "screenshots: private display :$dpy"
 export DISPLAY=":$dpy"
 
 run() {   # app-binary args...
-  timeout 60 "$@" >>"$root/apps.log" 2>&1 || echo "screenshots: $1 exited $?" >&2
+  timeout 90 "$@" >>"$root/apps.log" 2>&1 || echo "screenshots: $1 exited $?" >&2
 }
-run "$here/ThemeSettingsApp/ThemeSettings.app/ThemeSettings" -GTSExtraThemeRoot "$here/examples" \
-  -GTSScreenshot "$out/standalone-global.png"
-run "$here/ThemeSettingsApp/ThemeSettings.app/ThemeSettings" -GTSExtraThemeRoot "$here/examples" \
-  -GTSTargetApp "$root/apps/Writer.app" -GTSScreenshot "$out/standalone-app-adwaita.png"
-run "$here/ThemeSettingsDemo/DemoNotes.app/DemoNotes" -GTSExtraThemeRoot "$here/examples" \
-  -GTSOpenSettings YES -GTSScreenshot "$out/inapp-pane-gumdrop.png"
-grep -h "screenshot" "$root/apps.log" || true
-ls -l "$out"
+APP="$here/ThemeSettingsApp/ThemeSettings.app/ThemeSettings"
+DEMO="$here/ThemeSettingsDemo/DemoNotes.app/DemoNotes"
+X="-GTSExtraThemeRoot $here/examples"
+check() {   # domain key expected label
+  got=$(/usr/bin/defaults read "$1" "$2" 2>/dev/null | sed "s/^$1 $2 //")
+  if [ "$got" = "$3" ]; then echo "CHECK ok: $4 ($1 $2 = ${got:-<absent>})"
+  else echo "CHECK FAILED: $4 ($1 $2 = ${got:-<absent>}, want ${3:-<absent>})"; checkfail=1; fi
+}
+checkfail=0
+
+# A. standalone, global target
+run "$APP" $X -GTSScreenshot "$out/A-standalone-global.png"
+
+# B. standalone, app target: explicit vs inherited vs Info.plist; stage, Apply, receipt
+run "$APP" $X -GTSTargetApp "$root/apps/Writer.app" -GTSScript \
+  "shot $out/B1-app-initial.png; choose adwaita.accent-color purple; shot $out/B2-app-staged.png; apply; log; shot $out/B3-app-applied-restart-receipt.png"
+check org.example.Writer GnomeThemeAccentColor purple "B Apply wrote the app domain"
+check NSGlobalDomain GnomeThemeColorScheme force-dark "B global untouched"
+
+# C. in-app pane (same editor class): Apply, then Reset staged and Cancelled
+run "$DEMO" $X -GTSOpenSettings YES -GTSScript \
+  "shot $out/C1-pane-initial.png; choose gumdrop.menu-style primary; apply; log; shot $out/C2-pane-applied.png; reset gumdrop.menu-style; shot $out/C3-pane-reset-staged.png; cancel; shot $out/C4-pane-cancelled.png"
+check org.gnustep.themesettings.DemoNotes GumdropMenuStyle primary "C Apply wrote, Reset was cancelled"
+
+# D. in-app pane, live setting: honest receipt (saved; live not confirmed)
+D write org.gnustep.themesettings.DemoNotes GSTheme Adwaita
+run "$DEMO" $X -GTSOpenSettings YES -GTSScript \
+  "choose adwaita.header-bar-toolbar YES; apply; log; shot $out/D-pane-live-receipt.png"
+check org.gnustep.themesettings.DemoNotes GnomeThemeHeaderBarToolbar YES "D Apply wrote a live setting"
+
+# E. unreadable target domain: refused, nothing editable, file untouched
+mkdir -p "$root/apps/Locked.app/Resources"
+echo '{ CFBundleIdentifier = "org.example.Locked"; }' > "$root/apps/Locked.app/Resources/Info-gnustep.plist"
+D write org.example.Locked GSTheme Adwaita
+before=$(sha256sum "$root/user/Defaults/org.example.Locked.plist" | cut -d' ' -f1)
+chmod 000 "$root/user/Defaults/org.example.Locked.plist"
+run "$APP" $X -GTSTargetApp "$root/apps/Locked.app" -GTSScript \
+  "log; shot $out/E-unreadable-refused.png; theme Gumdrop"
+chmod 600 "$root/user/Defaults/org.example.Locked.plist"
+after=$(sha256sum "$root/user/Defaults/org.example.Locked.plist" | cut -d' ' -f1)
+[ "$before" = "$after" ] && echo "CHECK ok: E unreadable domain file unchanged" || { echo "CHECK FAILED: E file changed"; checkfail=1; }
+
+grep -h "^script:\|screenshot" "$root/apps.log" || true
+ls "$out"
+[ "$checkfail" -eq 0 ] || fail "read-back checks failed"

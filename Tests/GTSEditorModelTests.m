@@ -5,6 +5,7 @@
 #import "GTSThemeCatalog.h"
 #import "GTSThemeSettingsSchema.h"
 #import "GTSDefaultsDomainStore.h"
+#include <sys/stat.h>
 
 @interface GTSEditorModelTests : XCTestCase
 {
@@ -141,6 +142,25 @@
   XCTAssertEqualObjects([[self rowNamed: @"gumdrop.menu-style"] stateText], @"Set for this application");
   XCTAssertTrue([model apply]);
   XCTAssertEqualObjects(GTSExternalRead(app, @"GumdropMenuStyle"), @"primary");
+}
+
+- (void) testUnreadableTargetShowsNothingAsCurrent
+{
+  NSString *locked = GTSUniqueDomain(@"locked");
+  NSString *file;
+  GTSMustRunDefaults([NSArray arrayWithObjects: @"write", locked, @"GSTheme", @"Adwaita", nil]);
+  file = [[GTSDefaultsDomainStore defaultsRoot] stringByAppendingPathComponent:
+    [locked stringByAppendingPathExtension: @"plist"]];
+  chmod([file fileSystemRepresentation], 0000);
+  XCTAssertFalse([model setTargetApplicationDomain: locked displayName: @"Locked" info: nil]);
+  chmod([file fileSystemRepresentation], 0600);
+  XCTAssertFalse([model isEditable]);
+  XCTAssertEqual([[model themeChoices] count], (NSUInteger)1);
+  XCTAssertEqualObjects([[[model themeChoices] lastObject] title], @"Unknown (settings could not be read)");
+  XCTAssertEqualObjects([model themeStateText], @"Not available");
+  XCTAssertEqual([[model rows] count], (NSUInteger)0);
+  XCTAssertFalse([model apply]);
+  XCTAssertNotNil([model message]);
 }
 
 - (void) testGlobalTarget

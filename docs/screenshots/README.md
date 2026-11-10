@@ -1,15 +1,27 @@
 # Screenshots (2026-11-10, iep-platform, private Xvfb :200, isolated defaults)
 
-Produced by `scripts/screenshots.sh <dir>`: Debian gnustep-gui 0.32.0 with
-the default GNUstep theme drawing the editor itself. Theme metadata comes from
-`examples/` (owner-reviewed drafts), and the defaults are seeded only in a
-scratch defaults root.
+Produced by `scripts/screenshots.sh <dir>`. Apps built against, and run on,
+the same Debian packages: gnustep-gui 0.32.0-3+b1 headers and runtime,
+gnustep-base 1.31.1-3, GCC libobjc (no header/runtime mix, per the lead's
+NSTextAlignment note). The editor itself is drawn by the default GNUstep theme.
+Theme metadata comes from `examples/` (owner-reviewed drafts), and every value
+lives in a scratch defaults root that a read-only probe checks before any app
+starts. Each scenario drives the editor's real controls (`-GTSScript`) and
+is checked afterwards by reading the value back with `/usr/bin/defaults`.
 
-| File | What it shows |
-|---|---|
-| standalone-global.png | Standalone configurator, target "All applications": no global GSTheme, so the theme is GNUstep's built-in one, which has no settings. |
-| standalone-app-adwaita.png | Same app, target Writer (org.example.Writer, a stand-in bundle). GSTheme=Adwaita is set for the app. Style is inherited from the global value force-dark, Accent colour is overridden for the app (Reset enabled), Control sizes come from Writer's Info.plist (compact), Menus is Automatic (dynamic default), Toolbar in header bar is the theme default. |
-| inapp-pane-gumdrop.png | DemoNotes app's in-app pane: the same editor class, targeting the host's own domain (org.gnustep.themesettings.DemoNotes) by default, with an explicit "all applications" switch. GSTheme=Gumdrop for the app; Menu style comes from DemoNotes' Info.plist (menubar). |
+| File | Host | What it shows |
+|---|---|---|
+| A-standalone-global.png | standalone | Target "All applications". No global GSTheme, so the built-in theme applies, which has no settings. |
+| B1-app-initial.png | standalone | Target Writer (org.example.Writer). Adwaita is set for the app. Style is inherited from global force-dark, Accent colour is set for the app, Control sizes come from Writer's Info.plist, Menus is Automatic, Toolbar is the theme default. |
+| B2-app-staged.png | standalone | Accent colour changed to Purple: staged only, so Apply and Cancel are enabled and nothing is written yet. |
+| B3-app-applied-restart-receipt.png | standalone | After Apply: the receipt "Saved. Restart the affected applications..." Read-back: Writer GnomeThemeAccentColor = purple, global unchanged. |
+| C1-pane-initial.png | in-app pane | The same editor class, on the host's own domain. Gumdrop is set for the app; Menu style comes from DemoNotes' Info.plist. |
+| C2-pane-applied.png | in-app pane | Menu style set to the title-bar button and applied (restart receipt). |
+| C3-pane-reset-staged.png | in-app pane | Reset staged: the row shows what removing the key reveals (the app's Info.plist value). |
+| C4-pane-cancelled.png | in-app pane | Cancel: back to the saved state. Read-back: GumdropMenuStyle = primary (the reset was not written). |
+| D-pane-live-receipt.png | in-app pane | Adwaita "Toolbar in header bar" is declared live. The receipt says it was saved and that live application has NOT been confirmed for this app. |
+| E-unreadable-refused.png | standalone | The target's domain file is unreadable (mode 000). Nothing is shown as current, nothing is editable, and the error names the file. Read-back: the file is byte-identical afterwards. The scripted "theme Gumdrop" step fails because the control is disabled, which is the expected refusal. |
 
-Not shown or proven yet: Apply from the GUI in a running app, live
-propagation to another process, and Windows/macOS.
+Not shown or proven: a running theme actually re-rendering (the example
+themes are metadata only, not loadable themes), cross-process live
+propagation, AppImage/sidecar targets, Windows/macOS.

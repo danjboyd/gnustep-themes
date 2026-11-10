@@ -158,6 +158,8 @@ stateText(GTSResolvedValue *v, BOOL global)
 - (NSArray*) themeChoices
 {
   NSMutableArray *a = [NSMutableArray array];
+  if (_session == nil)   /* nothing known: never present a guess as current */
+    return [NSArray arrayWithObject: [GTSChoice choiceWithTitle: @"Unknown (settings could not be read)" value: nil]];
   GTSResolvedValue *v = [[self resolver] resolveThemeSelection];
   NSEnumerator *e = [[_catalog themes] objectEnumerator];
   GTSThemeRecord *r;
@@ -195,6 +197,7 @@ stateText(GTSResolvedValue *v, BOOL global)
 
 - (NSString*) themeStateText
 {
+  if (_session == nil) return @"Not available";
   return stateText([[self resolver] resolveThemeSelection], [self targetIsGlobal]);
 }
 
@@ -207,6 +210,9 @@ stateText(GTSResolvedValue *v, BOOL global)
 {
   GTSThemeRecord *r = [self effectiveTheme];
   NSMutableArray *parts = [NSMutableArray array];
+  if (_session == nil)
+    return @"This target's settings could not be read, so nothing here can be shown or changed. "
+      @"Nothing has been written. See the message below.";
   if (![r isAvailable])
     return [NSString stringWithFormat: @"%@ is selected but not installed for this target; "
       @"GNUstep falls back to its default theme.", [r name]];
@@ -427,7 +433,8 @@ stateText(GTSResolvedValue *v, BOOL global)
       else if (req == GTSApplyNewWindows)
         m = @"Saved. Windows and panels opened from now on use the new settings.";
       else if ([self editsHostProcess])
-        m = @"Saved. This application picks the change up as it runs.";
+        m = @"Saved. The theme says it applies these settings while the app runs; "
+            @"that has not been confirmed for this app. Restarting always applies them.";
       else
         m = @"Saved. Running applications that watch these settings may update; "
             @"a restart is the guaranteed way to see them.";

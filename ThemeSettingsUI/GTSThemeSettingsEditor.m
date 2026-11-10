@@ -38,6 +38,10 @@ wrappedHeight(NSString *text, float width, float size)
   return lines * (size + 5) + 2;
 }
 
+@interface GTSThemeSettingsEditor (Private)
+- (NSView*) firstPopup;
+@end
+
 @implementation GTSThemeSettingsEditor
 
 - (id) initWithModel: (GTSEditorModel*)model
@@ -49,7 +53,7 @@ wrappedHeight(NSString *text, float width, float size)
   _view = [[NSView alloc] initWithFrame: frame];
   [_view setAutoresizingMask: NSViewWidthSizable | NSViewHeightSizable];
 
-  _scroll = [[NSScrollView alloc] initWithFrame: NSMakeRect(0, 52, frame.size.width, frame.size.height - 52)];
+  _scroll = [[NSScrollView alloc] initWithFrame: NSMakeRect(0, 64, frame.size.width, frame.size.height - 64)];
   [_scroll setHasVerticalScroller: YES];
   [_scroll setBorderType: NSNoBorder];
   [_scroll setAutoresizingMask: NSViewWidthSizable | NSViewHeightSizable];
@@ -58,7 +62,8 @@ wrappedHeight(NSString *text, float width, float size)
   [_view addSubview: _scroll];
 
   _message = [label(@"", 11, NO, [NSColor darkGrayColor]) retain];
-  [_message setFrame: NSMakeRect(kMargin, 8, frame.size.width - 300, 36)];
+  [[_message cell] setWraps: YES];
+  [_message setFrame: NSMakeRect(kMargin, 4, frame.size.width - 300, 56)];
   [_message setAutoresizingMask: NSViewWidthSizable | NSViewMaxYMargin];
   [_view addSubview: _message];
 
@@ -229,6 +234,92 @@ wrappedHeight(NSString *text, float width, float size)
   [_message setStringValue: [_model message] ? [_model message] : @""];
   [_apply setEnabled: editable && [_model hasChanges]];
   [_cancel setEnabled: [_model hasChanges]];
+}
+
+- (NSControl*) controlOfClass: (Class)c tag: (NSInteger)tag title: (NSString*)title
+{
+  NSEnumerator *e = [[_content subviews] objectEnumerator];
+  NSView *v;
+  while ((v = [e nextObject]) != nil)
+    if ([v isKindOfClass: c] && (tag < 0 || [(NSControl*)v tag] == tag)
+      && (title == nil || [[(NSButton*)v title] isEqual: title]))
+      return (NSControl*)v;
+  return nil;
+}
+
+- (NSInteger) rowIndexForSetting: (NSString*)ident
+{
+  NSUInteger i;
+  for (i = 0; i < [_rows count]; i++)
+    if ([[[[_rows objectAtIndex: i] setting] identifier] isEqual: ident]) return i;
+  return -1;
+}
+
+- (BOOL) performScriptedAction: (NSString*)action
+{
+  NSArray *w = [action componentsSeparatedByString: @" "];
+  NSString *verb = [w count] ? [w objectAtIndex: 0] : @"";
+  NSControl *c = nil;
+
+  if ([verb isEqual: @"apply"]) c = _apply;
+  else if ([verb isEqual: @"cancel"]) c = _cancel;
+  else if ([verb isEqual: @"reload"]) c = _reload;
+  if (c != nil)
+    {
+      if (![c isEnabled]) return NO;
+      [(NSButton*)c performClick: self];
+      return YES;
+    }
+  if ([verb isEqual: @"theme"] && [w count] == 2)
+    {
+      NSArray *vals = [[_model themeChoices] valueForKey: @"value"];
+      NSUInteger i = [vals indexOfObject: [w objectAtIndex: 1]];
+      NSPopUpButton *p = (NSPopUpButton*)[self firstPopup];   /* theme popup is laid out first */
+      if (i == NSNotFound || p == nil || ![p isEnabled]) return NO;
+      [p selectItemAtIndex: i];
+      [p sendAction: [p action] to: [p target]];
+      return YES;
+    }
+  if (([verb isEqual: @"choose"] && [w count] >= 3) || ([verb isEqual: @"reset"] && [w count] == 2))
+    {
+      NSInteger r = [self rowIndexForSetting: [w objectAtIndex: 1]];
+      GTSSettingRow *row;
+      if (r < 0) return NO;
+      row = [_rows objectAtIndex: r];
+      if ([verb isEqual: @"reset"])
+        c = [self controlOfClass: [NSButton class] tag: r title: @"Reset"];
+      else
+        {
+          NSString *val = [[w subarrayWithRange: NSMakeRange(2, [w count] - 2)] componentsJoinedByString: @" "];
+          NSUInteger i, n = [[row choices] count];
+          NSEnumerator *e = [[_content subviews] objectEnumerator];
+          NSView *v;
+          NSPopUpButton *p = nil;
+          /* row popups come after the theme popup; match by tag */
+          while ((v = [e nextObject]) != nil)
+            if ([v isKindOfClass: [NSPopUpButton class]] && [(NSControl*)v tag] == r && v != [self firstPopup])
+              p = (NSPopUpButton*)v;
+          for (i = 0; i < n; i++)
+            if ([[[[row choices] objectAtIndex: i] value] isEqual: val]) break;
+          if (p == nil || i == n || ![p isEnabled]) return NO;
+          [p selectItemAtIndex: i];
+          [p sendAction: [p action] to: [p target]];
+          return YES;
+        }
+      if (c == nil || ![c isEnabled]) return NO;
+      [(NSButton*)c performClick: self];
+      return YES;
+    }
+  return NO;
+}
+
+- (NSView*) firstPopup
+{
+  NSEnumerator *e = [[_content subviews] objectEnumerator];
+  NSView *v;
+  while ((v = [e nextObject]) != nil)
+    if ([v isKindOfClass: [NSPopUpButton class]]) return v;
+  return nil;
 }
 
 - (void) themeChanged: (id)sender
