@@ -278,6 +278,8 @@ stateText(GTSResolvedValue *v, BOOL global)
       NSMutableArray *lines = [NSMutableArray array];
       NSString *seed = [_sidecar seededTheme];
       id local = [_roApp objectForKey: @"GSTheme"];
+      if (_binding != GTSSidecarBound)   /* metadata not tied to this AppImage: no predictions */
+        return @"Not available. This view cannot change settings.";
       /* 1. What the package says (prediction, independent of any store). */
       if (seed == nil)
         [lines addObject: @"Package: sets no default theme."];

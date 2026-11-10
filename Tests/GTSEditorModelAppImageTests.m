@@ -126,6 +126,8 @@
   GTSMustRunDefaults([NSArray arrayWithObjects: @"write", domain, @"GSTheme", @"Gumdrop", nil]);
   XCTAssertFalse([model setTargetAppImageSidecar: [self sidecar] appImage: nil]);
   XCTAssertTrue([[model themeNote] rangeOfString: @"has changed"].location != NSNotFound);
+  XCTAssertTrue([[model themeStateText] rangeOfString: @"Package default"].location == NSNotFound,
+    @"no prediction from metadata that doesn't match the AppImage");
   XCTAssertEqual([[model rows] count], (NSUInteger)0, @"stale metadata is not used for values");
   XCTAssertEqualObjects([[[model themeChoices] lastObject] title], @"Not known for the running AppImage");
   [self assertNothingEditable];
