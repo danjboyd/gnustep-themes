@@ -80,6 +80,7 @@ isHex64(NSString *s)
 - (NSString*) origin { return _origin; }
 - (NSString*) infoStatus { return _infoStatus; }
 - (NSString*) bundledPath { return _bundledPath; }
+- (NSString*) executableStatus { return _executableStatus; }
 - (GTSSidecarSettingsStatus) settingsStatus { return _settingsStatus; }
 - (NSString*) settingsNote { return _settingsNote; }
 - (GTSThemeSettingsSchema*) schema { return _schema; }

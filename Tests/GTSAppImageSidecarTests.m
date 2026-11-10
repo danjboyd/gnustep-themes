@@ -130,6 +130,33 @@ inlineGumdrop(void)
   XCTAssertFalse([g isCompatibilityKnown], @"compatibility is never inferred from metadata");
 }
 
+- (void) testAvailabilityStatusesAreKeptAsGiven
+{
+  NSMutableDictionary *d = [self sidecarFor: [appimage lastPathComponent] sha: GTSSHA256HexOfFile(appimage)];
+  NSArray *cases = [NSArray arrayWithObjects:
+    [NSDictionary dictionaryWithObjectsAndKeys: @"OutsideLink", @"name", @"unavailable", @"infoStatus",
+      [NSDictionary dictionaryWithObjectsAndKeys: @"usr/x/OutsideLink.theme", @"bundledPath",
+        @"unavailable", @"executableStatus", [NSNull null], @"executableSha256", nil], @"installation",
+      [NSDictionary dictionaryWithObjectsAndKeys: @"unavailable", @"status", nil], @"settings", nil],
+    [NSDictionary dictionaryWithObjectsAndKeys: @"NoCode", @"name", @"ok", @"infoStatus",
+      [NSDictionary dictionaryWithObjectsAndKeys: @"usr/x/NoCode.theme", @"bundledPath",
+        @"absent", @"executableStatus", nil], @"installation", [NSNull null], @"settings", nil],
+    [NSDictionary dictionaryWithObjectsAndKeys: @"Unstated", @"name",
+      [NSDictionary dictionaryWithObjectsAndKeys: @"usr/x/Unstated.theme", @"bundledPath", nil], @"installation", nil],
+    nil];
+  GTSAppImageSidecar *s;
+  [d setObject: cases forKey: @"themes"];
+  [self writeSidecar: d];
+  s = [GTSAppImageSidecar sidecarWithContentsOfFile: sidecar error: NULL];
+  XCTAssertEqualObjects([[s themeNamed: @"OutsideLink"] infoStatus], @"unavailable");
+  XCTAssertEqualObjects([[s themeNamed: @"OutsideLink"] executableStatus], @"unavailable");
+  XCTAssertEqual([[s themeNamed: @"OutsideLink"] settingsStatus], GTSSettingsUnavailable);
+  XCTAssertFalse([[s themeNamed: @"OutsideLink"] isFullyDescribed]);
+  XCTAssertEqualObjects([[s themeNamed: @"NoCode"] executableStatus], @"absent");
+  XCTAssertNil([[s themeNamed: @"Unstated"] infoStatus], @"not stated is not 'ok'");
+  XCTAssertNil([[s themeNamed: @"Unstated"] executableStatus]);
+}
+
 - (void) testInvalidInlineSettingsAreNotDescribed
 {
   NSMutableDictionary *d = [self sidecarFor: [appimage lastPathComponent] sha: GTSSHA256HexOfFile(appimage)];

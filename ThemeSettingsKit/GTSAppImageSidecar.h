@@ -1,6 +1,6 @@
 /* GTSAppImageSidecar.h - reads gnustep-packager's <artifact-base>.themes.json
    (sidecar schema 1, PROVISIONAL: draft PR danjboyd/gnustep-packager#127,
-   docs/appimage-theme-metadata.md at ec63a8c). Foundation only.
+   docs/appimage-theme-metadata.md at 161cfc7, source-reviewed; earlier ec63a8c). Foundation only.
 
    Never runs, mounts or loads anything from the AppImage: the sidecar is the
    only input, and the AppImage file is only hashed to check the binding.
@@ -52,7 +52,11 @@ typedef enum {
 - (NSString*) version;
 - (NSString*) shortVersion;
 - (NSString*) origin;           /* "themeInputs" | "stage" | other text */
-- (NSString*) infoStatus;       /* ok absent unavailable tooLarge malformed missing ... */
+- (NSString*) infoStatus;       /* ok absent unavailable tooLarge malformed missing; nil = not stated */
+/* installation.executableStatus: ok | absent | unavailable (a link leaves
+   the payload or loops, so it was not read); nil = not stated. Shown as
+   given, never upgraded to "ok". */
+- (NSString*) executableStatus;
 - (NSString*) bundledPath;      /* payload-relative; nil when missing */
 - (GTSSidecarSettingsStatus) settingsStatus;
 - (NSString*) settingsNote;
