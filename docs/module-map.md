@@ -10,7 +10,8 @@ Status: draft, 2026-11-10. Owner of this repo: agent `gnustep-themes`. Liaison: 
 | `ThemeSettingsUI` (library) | AppKit + ThemeSettingsKit | Reusable editor view/controller. Same object is embedded by both front ends. |
 | `ThemeSettingsApp` (app) | ThemeSettingsUI | Standalone configurator: global + per-app targets; picks a target app, resolves its real defaults domain and the themes visible to it. |
 | In-app pane | ThemeSettingsUI | Host app embeds the editor; target defaults to the host's own domain; global editing is an explicit switch. |
-| `Tests` (xctest bundle) | ThemeSettingsKit | Defaults proof + schema/discovery/resolver tests under an isolated `GNUSTEP_CONFIG_FILE`. |
+| `Tests` (xctest bundle) | ThemeSettingsKit | Defaults proof + schema/discovery/resolver/session/model/sidecar tests under an isolated `GNUSTEP_CONFIG_FILE` (`scripts/run-tests.sh`); harness self-test `scripts/test-runner.sh`; GUI scenarios `scripts/screenshots.sh` (private Xvfb). |
+| AppImage sidecar reader (`GTSAppImageSidecar`, `GTSSHA256`) | ThemeSettingsKit + GnuTLS | Reads `<artifact>.themes.json` (gnustep-packager main 776cb2e); never mounts or runs AppImages; AppImage targets are read-only. |
 
 Later: SystemPreferences module reuses `ThemeSettingsUI` unchanged.
 
@@ -34,3 +35,33 @@ Later: SystemPreferences module reuses `ThemeSettingsUI` unchanged.
 ## Isolation for tests (host iep-platform, Debian base 1.31.1 / gui 0.32.0, GCC libobjc)
 
 `GNUSTEP_USER_CONFIG_FILE` in the environment is **not** honoured by base 1.31 here; defaults still went to `~/GNUstep/Defaults`. What works: `GNUSTEP_CONFIG_FILE` pointing at a 0600 copy of `/etc/GNUstep/GNUstep.conf` whose `GNUSTEP_USER_CONFIG_FILE` and `GNUSTEP_USER_DEFAULTS_DIR` are absolute scratch paths. Every test/probe checks `GSDefaultsRootForUser(NSUserName())` is under the scratch root before writing and refuses otherwise.
+
+## Status and accepted checkpoints (2026-11-10)
+
+All test evidence is **self-run** on iep-platform. The lead
+(gnustep-tools-lead) reviewed critical paths from pasted source excerpts
+only; visual review of the screenshots has not been done independently.
+
+| Checkpoint | Head | Evidence | Accepted by lead |
+|---|---|---|---|
+| Persistence/session critical paths (fail-closed store, domain binding, write-outcome gating) | 5e7a1f6 | unit + two-process tests | yes, source review (#21008) |
+| Test harness (isolation, child-runtime guard, owned-process cleanup) | 866cb5c | 14/14 harness self-test | yes (#21023) |
+| UI proof: same editor in standalone and in-app pane | 6113aed | scenarios A to E + read-backs | yes, visual unverified (#21093) |
+| Free-form field commit on Apply | 8b1be21 | scenario F | yes (#21198) |
+| AppImage sidecar reader | 8adc88e (aligned 5c50e75, pinned a410c52) | 19 sidecar tests | yes (#21531) |
+| Read-only AppImage targets in the editor | 62570a2 | 101/101 model tests; scenario G used a stand-in artifact and predates the final text | yes (#21659) |
+
+## Unresolved proof gaps
+
+* A theme actually re-rendering after Apply: the example themes are metadata only.
+* Cross-process live propagation, and whether a host's `standardUserDefaults` sees in-app edits.
+* The same-key write race (optimistic detection only). The backend preflight is not atomic.
+* Return-to-Apply in free-form fields (only click-Apply is exercised).
+* `scripts/screenshots.sh` cannot see unmarked descendants (no session-based containment).
+* No real AppImage tested; whether an AppImage uses the same defaults store is unknown by design.
+* Windows/macOS: see docs/platforms.md (editing disabled or untested).
+* Theme-code/runtime compatibility is never inferred.
+* An independent rerun of the suites by someone other than the author.
+
+See docs/platforms.md for platform requirements and docs/embedding.md for
+embedding and the SystemPreferences plan.

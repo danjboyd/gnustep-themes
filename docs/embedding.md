@@ -1,0 +1,114 @@
+# Embedding the theme settings editor, and a SystemPreferences plan
+
+Status: 2026-11-10, against local HEAD (see docs/module-map.md). This is a
+plan: nothing here is implemented in SystemPreferences, and no existing
+pane is replaced or migrated.
+
+## 1. Embedding `GTSThemeSettingsEditor` in an app (in-app pane)
+
+`ThemeSettingsDemo/main.m` already does this (DemoNotes). The rules:
+
+**Ownership**
+
+| Piece | Owned by | Notes |
+|---|---|---|
+| `ThemeSettingsKit` (model, store, schema, catalog, sidecar) | this repo | Foundation only |
+| `ThemeSettingsUI` (`GTSThemeSettingsEditor`, screenshot/script helpers) | this repo | AppKit; renders the model and decides nothing itself |
+| The window or panel, menu item and the "all applications" switch | host app | the editor provides a view only |
+| ThemeSettings.plist for each theme | theme owners | adwaita, winuitheme, fun-themes |
+
+**Build dependencies:** gnustep-base, gnustep-gui and GnuTLS. Include
+`gts-config.make` so GnuTLS is detected and linked explicitly. Compile
+`ThemeSettingsKit/GTS*.m` and `ThemeSettingsUI/GTS*.m`, as the demo does, or
+link `libThemeSettingsKit` (UI library packaging is not done yet). No
+libobjc2-only features are used, and the GCC runtime works.
+
+**Wiring (in this order)**
+```objc
+GTSDefaultsDomainStore *store = [[GTSDefaultsDomainStore alloc]
+  initWithHostDefaults: [NSUserDefaults standardUserDefaults]]; /* synced after commits */
+GTSEditorModel *model = [[GTSEditorModel alloc] initWithStore: store
+                                                      catalog: [[GTSThemeCatalog alloc] init]];
+NSString *me = [[NSBundle mainBundle] bundleIdentifier];
+if ([me length] == 0) me = [[NSProcessInfo processInfo] processName];  /* base's own rule */
+[model setHostDomain: me];
+[model setTargetApplicationDomain: me displayName: @"This application"
+                             info: [[NSBundle mainBundle] infoDictionary]];
+GTSThemeSettingsEditor *editor = [[GTSThemeSettingsEditor alloc] initWithModel: model];
+[editor setDelegate: self];      /* themeSettingsEditorDidApply: */
+[[panel contentView] addSubview: [editor view]];
+```
+* **Default target:** the host's own domain. Editing global settings is an
+  explicit host control that calls `setTargetGlobal`; the host asks the user
+  first if `hasChanges`.
+* **Failures:** `setTarget...` returns NO when the domain can't be read
+  reliably. The editor then shows "Unknown" and nothing can be edited, so the
+  host must not hide that state.
+
+**Host callbacks and lifecycle receipts**
+* Today: `themeSettingsEditorDidApply:` fires only after a save succeeded.
+  The model's `message` gives the receipt text, and the session's
+  `GTSApplyReceipt` carries the strongest Apply requirement (restart,
+  newWindows or live) and `refreshFailed`.
+* **Gap to close before a SystemPreferences pane:** expose the last receipt
+  on the model (`-lastApplyReceipt`), so a host can decide for itself (for
+  example by offering "Restart now"). Hosts must not parse message text.
+* An unknown save outcome (`GTSErrorWriteFailed`) or a refresh failure
+  leaves the session needing a reload. The editor's Reload button handles
+  this, and the host must not re-apply the change on its own.
+* Live settings: when the pane edits its own domain, the receipt says it was
+  saved and that live application is *unconfirmed*. Whether the host's own
+  `standardUserDefaults` reflects the change and the theme redraws has not
+  been checked.
+
+**Closing:** if `hasChanges`, ask the user to Apply, Discard or Cancel the
+close. Pending text in a free-form field is staged on every keystroke, and
+Apply commits it.
+
+## 2. SystemPreferences follow-on plan (not started)
+
+**Shape:** a preference-pane bundle (e.g. `Themes.prefPane`, principal class
+an `NSPreferencePane` subclass) whose `mainView` hosts `[editor view]`. The
+pane uses a target list like the standalone app's (global, installed apps,
+read-only AppImage sidecars). SystemPreferences runs in its own process, so
+it is never the "host domain": live application is unconfirmed for every
+target.
+
+**Ownership questions to settle before any work**
+* Who owns the SystemPreferences app and the GNUstep repository it lives in?
+  Any change there needs that owner, and may be upstream (`upstream.propose`,
+  Dan's review).
+* Whether an existing themes pane is replaced or a new pane is added next to
+  it. Replacing one needs Dan's decision; a migration path is out of scope
+  until then.
+
+**Prerequisites (each needs evidence first)**
+1. `-lastApplyReceipt` on the model (see above), with tests.
+2. A packaged `libThemeSettingsUI` (headers plus library), so the pane does
+   not compile our sources into itself; a build test against the installed
+   library in a scratch prefix, never a global install.
+3. Pane lifecycle: `willUnselect`/`shouldUnselect` mapped to the unsaved-
+   changes prompt; GUI test on a private Xvfb with scratch defaults.
+4. Target discovery in the pane process: the same `GTSThemeCatalog` roots as
+   the standalone app. User-dir shadowing is shown.
+5. Theme metadata merged by owners: WinUI (#196) is merged; Adwaita (#138)
+   is still a draft; Gumdrop is reviewed but not committed in its repo.
+6. Platform gate as in docs/platforms.md: Linux only until the
+   Windows/macOS requirements there are met.
+
+**Tests needed before any pane replacement**
+* The model and store suites (existing, currently 101 tests, self-run) and
+  the harness self-test.
+* Pane-hosted GUI scenarios matching A to G in `scripts/screenshots.sh`:
+  global, app explicit/inherited/Info.plist, Apply/Cancel/Reset, free-form
+  commit, live receipt wording, unreadable target refused, AppImage
+  read-only. Each needs read-back checks and verified cleanup.
+* A target-switch-with-unsaved-changes test, and a pane-unselect-with-
+  unsaved-changes test.
+* An independent review of the critical paths, because the current
+  evidence is self-run.
+
+**Explicitly out of scope until decided:** previews (rendering a theme in
+the pane would load theme code into the SystemPreferences process, which
+the framework avoids by design); migrating existing settings; Windows and
+macOS.
