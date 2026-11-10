@@ -1,10 +1,11 @@
-/* WinUITheme - DRAFT for the winuitheme owner's review (they own this file).
-   Keys and semantics from owner inventory msg #20845 at
-   danjboyd/plugins-themes-winuitheme main 0619d01.
-   Colour-mode keys and checking overrides are deliberately not listed.
-   Owner review #20947 applied (overlay scrollbars, Mica help).
-   ThemeIdentifier is a proposed descriptor identity, not in WinUIThemeInfo.plist;
-   the owner chooses the final value. Native dialog keys do nothing off Windows. */
+/* WinUITheme's public settings, for the theme settings configurator, which
+   reads this file without loading theme code. The theme's defaults keys
+   stay the source of truth: change this file when their meaning changes.
+   The comments give where each key is read (as of main 0619d01).
+   Colour mode, the checking overrides and the diagnostics are deliberately
+   not listed (README, "Settings"). ThemeIdentifier is a provisional logical
+   name only, not a package identity; WinUIThemeInfo.plist has none.
+   The native dialog keys do nothing off Windows. */
 {
   SchemaVersion = 1;
   Theme = WinUITheme;
