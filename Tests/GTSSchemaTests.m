@@ -84,6 +84,7 @@ minimal(void)
   NSMutableDictionary *u = [[[[p objectForKey: @"Settings"] lastObject] mutableCopy] autorelease];
   GTSThemeSettingsSchema *s;
   [u setObject: @"x.unstable" forKey: @"Identifier"];
+  [u setObject: @"XUnstable" forKey: @"Key"];      /* one descriptor per key (Q4) */
   [u setObject: @"unstable" forKey: @"Status"];
   [[p objectForKey: @"Settings"] addObject: u];
   s = [GTSThemeSettingsSchema schemaWithPropertyList: p path: @"mem" error: NULL];
@@ -202,5 +203,86 @@ minimal(void)
   [p removeObjectForKey: @"ThemeIdentifier"];
   XCTAssertNil([GTSThemeSettingsSchema schemaWithPropertyList: p path: @"mem" error: &err]);
   XCTAssertEqual([err code], (NSInteger)GTSErrorInvalidSchema);
+}
+/* Lead decisions Q2/Q4 (#22591): the loader skips settings it used to accept
+   silently. Each case: the bad setting is skipped with one warning naming it,
+   and a valid neighbour still loads. */
+static GTSThemeSettingsSchema *
+withSecondSetting(NSDictionary *changes, NSString *removeKey)
+{
+  NSMutableDictionary *p = minimal();
+  NSMutableArray *a = [p objectForKey: @"Settings"];
+  NSMutableDictionary *n = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+    @"x.scale", @"Identifier", @"XScale", @"Key", @"number", @"Type",
+    [NSArray arrayWithObject: @"global"], @"Scopes",
+    [NSDictionary dictionaryWithObjectsAndKeys: @"static", @"Behavior", @"1.0", @"Value", nil], @"Unset",
+    @"restart", @"Apply", nil];
+  [n addEntriesFromDictionary: changes];
+  if (removeKey) [n removeObjectForKey: removeKey];
+  [a addObject: n];
+  return [GTSThemeSettingsSchema schemaWithPropertyList: p path: @"mem" error: NULL];
+}
+
+static BOOL
+skipped(GTSThemeSettingsSchema *s, NSString *needle)
+{
+  return s != nil && [[s settings] count] == 1 && [s settingWithIdentifier: @"x.flag"] != nil
+    && [[s warnings] count] == 1
+    && [[[s warnings] objectAtIndex: 0] rangeOfString: needle].location != NSNotFound;
+}
+
+- (void) testStatusTypoSkipsSetting
+{
+  GTSThemeSettingsSchema *s = withSecondSetting([NSDictionary dictionaryWithObject: @"Unstable" forKey: @"Status"], nil);
+  XCTAssertTrue(skipped(s, @"x.scale: Status Unstable is not public or unstable"), @"%@", [s warnings]);
+}
+
+- (void) testExplicitStatusValuesStillLoad
+{
+  GTSThemeSettingsSchema *s = withSecondSetting([NSDictionary dictionaryWithObject: @"public" forKey: @"Status"], nil);
+  XCTAssertEqual([[s settings] count], (NSUInteger)2);
+  XCTAssertFalse([[s settingWithIdentifier: @"x.scale"] isUnstable]);
+  s = withSecondSetting([NSDictionary dictionaryWithObject: @"unstable" forKey: @"Status"], nil);
+  XCTAssertTrue([[s settingWithIdentifier: @"x.scale"] isUnstable]);
+  XCTAssertEqual([[s warnings] count], (NSUInteger)0);
+}
+
+- (void) testNonNumericMinimumSkipsSetting
+{
+  GTSThemeSettingsSchema *s = withSecondSetting([NSDictionary dictionaryWithObject: @"small" forKey: @"Minimum"], nil);
+  XCTAssertTrue(skipped(s, @"x.scale: Minimum/Maximum must be numbers"), @"%@", [s warnings]);
+  s = withSecondSetting([NSDictionary dictionaryWithObject: @"2.0x" forKey: @"Maximum"], nil);
+  XCTAssertTrue(skipped(s, @"Minimum/Maximum must be numbers"), @"trailing junk: %@", [s warnings]);
+  s = withSecondSetting([NSDictionary dictionaryWithObject: [NSNumber numberWithBool: YES] forKey: @"Maximum"], nil);
+  XCTAssertTrue(skipped(s, @"Minimum/Maximum must be numbers"), @"bool: %@", [s warnings]);
+}
+
+- (void) testNumericMinimumFormsStillLoad
+{
+  GTSThemeSettingsSchema *s = withSecondSetting([NSDictionary dictionaryWithObjectsAndKeys:
+    @"0.8", @"Minimum", [NSNumber numberWithDouble: 2.0], @"Maximum", nil], nil);
+  GTSSettingDescriptor *d = [s settingWithIdentifier: @"x.scale"];
+  XCTAssertNotNil(d, @"%@", [s warnings]);
+  XCTAssertEqual([[d minimum] doubleValue], 0.8);
+  XCTAssertEqual([[d maximum] doubleValue], 2.0);
+}
+
+- (void) testInvertedRangeSkipsSetting
+{
+  /* dynamic Unset, so the Unset.Value range check cannot catch it first */
+  GTSThemeSettingsSchema *s = withSecondSetting([NSDictionary dictionaryWithObjectsAndKeys:
+    @"2.5", @"Minimum", @"2.0", @"Maximum",
+    [NSDictionary dictionaryWithObjectsAndKeys: @"dynamic", @"Behavior", @"follows the desktop", @"Help", nil], @"Unset",
+    nil], nil);
+  XCTAssertTrue(skipped(s, @"x.scale: Minimum 2.5 is greater than Maximum 2.0"), @"%@", [s warnings]);
+}
+
+- (void) testDuplicateKeyKeepsFirstSkipsLater
+{
+  GTSThemeSettingsSchema *s = withSecondSetting([NSDictionary dictionaryWithObjectsAndKeys:
+    @"XFlag", @"Key", @"bool", @"Type",
+    [NSDictionary dictionaryWithObjectsAndKeys: @"static", @"Behavior", @"YES", @"Value", nil], @"Unset", nil], nil);
+  XCTAssertTrue(skipped(s, @"x.scale: Key XFlag is already described by x.flag; skipped"), @"%@", [s warnings]);
+  XCTAssertEqualObjects([[s settingForKey: @"XFlag"] identifier], @"x.flag", @"the first descriptor wins");
 }
 @end

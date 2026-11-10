@@ -25,6 +25,25 @@ isString(id o)
   return [o isKindOfClass: [NSString class]] && [(NSString*)o length] > 0;
 }
 
+/* A real number: an NSNumber that is not a bool/char, or a string that
+   scans entirely as a double. */
+static BOOL
+GTSIsNumber(id v)
+{
+  if ([v isKindOfClass: [NSNumber class]])
+    {
+      const char *t = [v objCType];   /* bools are char-typed here, as for SchemaVersion */
+      return !(t && (*t == 'C' || *t == 'c' || *t == 'B'));
+    }
+  if ([v isKindOfClass: [NSString class]])
+    {
+      double dv;
+      NSScanner *sc = [NSScanner scannerWithString: v];
+      return [sc scanDouble: &dv] && [sc isAtEnd];
+    }
+  return NO;
+}
+
 /* Parses YES/NO/true/false/1/0. Returns -1 if not a bool spelling. */
 static int
 GTSBoolValue(id v)
@@ -251,10 +270,16 @@ static NSArray *knownSources = nil;
   if (d->_type == GTSSettingTypeNumber)
     {
       id mn = [p objectForKey: @"Minimum"], mx = [p objectForKey: @"Maximum"];
-      if ((mn && ![mn respondsToSelector: @selector(doubleValue)])
-        || (mx && ![mx respondsToSelector: @selector(doubleValue)]))
+      /* Strict: a non-numeric string must not silently become 0 (lead
+         decision Q2, #22591). */
+      if ((mn && !GTSIsNumber(mn)) || (mx && !GTSIsNumber(mx)))
         {
           [problems addObject: [NSString stringWithFormat: @"%@: Minimum/Maximum must be numbers", where]];
+          return nil;
+        }
+      if (mn && mx && [mn doubleValue] > [mx doubleValue])
+        {
+          [problems addObject: [NSString stringWithFormat: @"%@: Minimum %@ is greater than Maximum %@", where, mn, mx]];
           return nil;
         }
       if (mn) d->_minimum = [[NSNumber alloc] initWithDouble: [mn doubleValue]];
@@ -279,7 +304,14 @@ static NSArray *knownSources = nil;
 
   d->_dependsOn = [[p objectForKey: @"DependsOn"] copy];
   d->_overlaps = [([p objectForKey: @"Overlaps"] ? [p objectForKey: @"Overlaps"] : [NSArray array]) copy];
-  d->_unstable = [[p objectForKey: @"Status"] isEqual: @"unstable"];
+  o = [p objectForKey: @"Status"];
+  if (o != nil && ![o isEqual: @"public"] && ![o isEqual: @"unstable"])
+    {
+      /* A typo must not make an unstable entry public (lead decision Q2). */
+      [problems addObject: [NSString stringWithFormat: @"%@: Status %@ is not public or unstable", where, o]];
+      return nil;
+    }
+  d->_unstable = [o isEqual: @"unstable"];
 
   if (d->_unsetBehavior == GTSUnsetStatic && [d problemWithValue: d->_unsetValue] != nil)
     {
@@ -468,6 +500,7 @@ static NSArray *knownSources = nil;
   NSMutableArray *problems = [NSMutableArray array];
   NSMutableArray *settings = [NSMutableArray array];
   NSMutableSet *ids = [NSMutableSet set];
+  NSMutableDictionary *keyOwners = [NSMutableDictionary dictionary];
   NSEnumerator *e;
   id o, prov;
   NSInteger version;
@@ -520,7 +553,16 @@ static NSArray *knownSources = nil;
           [problems addObject: [NSString stringWithFormat: @"%@: duplicate Identifier skipped", [d identifier]]];
           continue;
         }
+      if ([keyOwners objectForKey: [d key]] != nil)
+        {
+          /* One descriptor per key; the first wins, later ones are skipped
+             (lead decision Q4, #22591). */
+          [problems addObject: [NSString stringWithFormat: @"%@: Key %@ is already described by %@; skipped",
+            [d identifier], [d key], [keyOwners objectForKey: [d key]]]];
+          continue;
+        }
       [ids addObject: [d identifier]];
+      [keyOwners setObject: [d identifier] forKey: [d key]];
       [settings addObject: d];
     }
 

@@ -64,23 +64,6 @@ static BOOL isBoolSpelling(id v)
     || [s isEqual: @"1"] || [s isEqual: @"0"];
 }
 
-/* A real number: NSNumber (not a bool) or a string that scans entirely. */
-static BOOL isNumber(id v)
-{
-  if ([v isKindOfClass: [NSNumber class]])
-    {
-      const char *t = [v objCType];
-      return !(t && (*t == 'B'));
-    }
-  if ([v isKindOfClass: [NSString class]])
-    {
-      double d;
-      NSScanner *sc = [NSScanner scannerWithString: v];
-      return [sc scanDouble: &d] && [sc isAtEnd];
-    }
-  return NO;
-}
-
 static void unknownKeys(GTSFindings *f, NSString *where, NSDictionary *d, NSArray *known, NSString *what)
 {
   NSEnumerator *e = [[[d allKeys] sortedArrayUsingSelector: @selector(compare:)] objectEnumerator];
@@ -128,7 +111,6 @@ static void unknownKeys(GTSFindings *f, NSString *where, NSDictionary *d, NSArra
   NSArray *settings, *groups;
   NSMutableSet *groupIds = [NSMutableSet set];
   NSMutableDictionary *byId = [NSMutableDictionary dictionary];   /* Identifier -> raw dict */
-  NSMutableDictionary *keyOwner = [NSMutableDictionary dictionary];
   NSEnumerator *e;
   id o;
 
@@ -206,10 +188,6 @@ static void unknownKeys(GTSFindings *f, NSString *where, NSDictionary *d, NSArra
         @"Apply", @"Minimum", @"Maximum", @"RequiredFeatures", @"DependsOn", @"Overlaps", @"Status", nil],
         @"setting");
 
-      if ([keyOwner objectForKey: key] != nil)
-        [f error: ident : @"Key %@ is also described by %@ (one descriptor per key)", key, [keyOwner objectForKey: key]];
-      else
-        [keyOwner setObject: ident forKey: key];
       if ([key isEqual: @"GSTheme"])
         [f error: ident : @"GSTheme is theme selection, not a theme setting"];
 
@@ -223,10 +201,6 @@ static void unknownKeys(GTSFindings *f, NSString *where, NSDictionary *d, NSArra
         [f warn: ident : @"Group %@ but the file has no Groups", v];
       else if (isStr(v) && ![groupIds containsObject: v])
         [f error: ident : @"Group %@ is not defined in Groups", v];
-
-      v = [s objectForKey: @"Status"];
-      if (v != nil && ![v isEqual: @"public"] && ![v isEqual: @"unstable"])
-        [f error: ident : @"Status %@ is not public or unstable (v1 readers treat it as public)", v];
 
       v = [s objectForKey: @"CaseInsensitive"];
       if (v != nil && !isBoolSpelling(v))
@@ -260,11 +234,8 @@ static void unknownKeys(GTSFindings *f, NSString *where, NSDictionary *d, NSArra
         id mn = [s objectForKey: @"Minimum"], mx = [s objectForKey: @"Maximum"];
         if ((mn || mx) && [d type] != GTSSettingTypeNumber)
           [f warn: ident : @"Minimum/Maximum are ignored for Type %@", [s objectForKey: @"Type"]];
-        else if ((mn && !isNumber(mn)) || (mx && !isNumber(mx)))
-          [f error: ident : @"Minimum/Maximum must be numbers (the loader reads %@/%@ as %@/%@)",
-            mn, mx, [d minimum], [d maximum]];
-        else if (mn && mx && [mn doubleValue] > [mx doubleValue])
-          [f error: ident : @"Minimum %@ is greater than Maximum %@", mn, mx];
+        /* Non-numeric or inverted ranges, Status typos and duplicate Keys
+           are loader errors since the Q2/Q4 decisions (#22591). */
       }
 
       v = [s objectForKey: @"Scopes"];

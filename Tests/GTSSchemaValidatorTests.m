@@ -39,7 +39,7 @@ expectations(void)
     @"Group looks is not defined in Groups", @"bad-group-undefined",
     @"Minimum/Maximum must be numbers", @"bad-minmax-string",
     @"Minimum 2.5 is greater than Maximum 2.0", @"bad-min-gt-max",
-    @"Key FxScale is also described by fx.scale", @"bad-duplicate-key",
+    @"Key FxScale is already described by fx.scale; skipped", @"bad-duplicate-key",
     @"enum value Dark duplicates dark", @"bad-duplicate-enum-value",
     @"Values entry ribbon", @"bad-precedence-filter",
     @"empty Precedence", @"bad-precedence-empty",
