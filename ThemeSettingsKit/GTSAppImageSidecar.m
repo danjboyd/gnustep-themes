@@ -88,6 +88,10 @@ isHex64(NSString *s)
 - (BOOL) isCompatibilityKnown { return NO; }
 @end
 
+@interface GTSAppImageSidecar (Private)
+- (void) checkProducerMatchFlag: (NSMutableArray*)warnings;
+@end
+
 @implementation GTSAppImageSidecar
 
 + (id) sidecarWithContentsOfFile: (NSString*)path error: (NSError**)error
@@ -195,6 +199,7 @@ isHex64(NSString *s)
   s->_path = [path copy];
   s->_json = [json retain];
   s->_themes = [themes copy];
+  [s checkProducerMatchFlag: warnings];
   s->_warnings = [warnings copy];
   return s;
 }
@@ -222,6 +227,7 @@ isHex64(NSString *s)
     return GTSSidecarArtifactMissing;
   if (![[p lastPathComponent] isEqual: [self appImageFileName]])
     return GTSSidecarNameMismatch;
+  if (!GTSSHA256IsAvailable()) return GTSSidecarCheckUnavailable;
   digest = GTSSHA256HexOfFile(p);
   if (digest == nil) return GTSSidecarUnreadable;
   return [digest isEqual: [self appImageSha256]] ? GTSSidecarBound : GTSSidecarHashMismatch;
@@ -236,6 +242,7 @@ isHex64(NSString *s)
       case GTSSidecarNameMismatch: return @"This theme information describes a different AppImage file.";
       case GTSSidecarHashMismatch: return @"The AppImage has changed since its theme information was written; it may be out of date.";
       case GTSSidecarUnreadable: return @"The AppImage could not be read to check its theme information.";
+      case GTSSidecarCheckUnavailable: return @"This build cannot check that the theme information matches the AppImage, so it is not used for editing.";
     }
   return @"";
 }
@@ -245,7 +252,8 @@ isHex64(NSString *s)
 - (NSString*) runtimeDomainHintSource
 {
   NSString *s = str([[self section: @"app"] objectForKey: @"runtimeDomainHintSource"]);
-  return s ? s : @"unknown";
+  /* Only sources the schema defines; anything else is unknown. */
+  return ([s isEqual: @"bundleIdentifier"] || [s isEqual: @"processName"]) ? s : @"unknown";
 }
 
 - (NSString*) runtimeDomainHint
@@ -258,10 +266,36 @@ isHex64(NSString *s)
 
 - (NSNumber*) seedDomainMatchesRuntimeHint
 {
+  NSString *a = [self seedDomain], *b = [self runtimeDomainHint];
+  if (a == nil || b == nil) return nil;
+  return [NSNumber numberWithBool: [a isEqual: b]];
+}
+
+/* Cross-check the producer's flag against our own derivation. */
+- (void) checkProducerMatchFlag: (NSMutableArray*)warnings
+{
   id m = [[self section: @"defaults"] objectForKey: @"seedDomainMatchesRuntimeHint"];
-  if (![m isKindOfClass: [NSNumber class]] || [self runtimeDomainHint] == nil || [self seedDomain] == nil)
-    return nil;
-  return m;
+  NSNumber *ours = [self seedDomainMatchesRuntimeHint];
+  const char *t;
+  if (m == nil || m == [NSNull null])
+    {
+      if (ours != nil)
+        [warnings addObject: @"seedDomainMatchesRuntimeHint is missing although both domains are known"];
+      return;
+    }
+  t = [m isKindOfClass: [NSNumber class]] ? [m objCType] : NULL;
+  if (t == NULL || !(*t == 'C' || *t == 'c' || *t == 'B'))
+    {
+      [warnings addObject: @"seedDomainMatchesRuntimeHint is not a boolean; ignored"];
+      return;
+    }
+  if (ours == nil)
+    [warnings addObject: @"seedDomainMatchesRuntimeHint is set although a domain is unknown; ignored"];
+  else if ([m boolValue] != [ours boolValue])
+    [warnings addObject: [NSString stringWithFormat:
+      @"seedDomainMatchesRuntimeHint says %@ but the domains %@ and %@ %@; using the domains",
+      [m boolValue] ? @"true" : @"false", [self seedDomain], [self runtimeDomainHint],
+      [ours boolValue] ? @"match" : @"differ"]];
 }
 
 - (NSDictionary*) gsThemeSeed
@@ -301,6 +335,7 @@ isHex64(NSString *s)
   NSString *seed = [self seededTheme];
   if (seed == nil || [self seedDomain] == nil) return GTSSeedNone;
   if (![[self seedDomain] isEqual: domain]) return GTSSeedWrongDomain;
+  if (![[self seedPolicy] isEqual: @"each-launch-if-absent"]) return GTSSeedPolicyUnknown;
   if (stored == nil) return GTSSeedAbsentWillApply;
   return [stored isEqual: seed] ? GTSSeedInEffect : GTSSeedOverriddenByUser;
 }
@@ -321,6 +356,9 @@ isHex64(NSString *s)
       case GTSSeedOverriddenByUser:
         return [NSString stringWithFormat: @"Chosen for this app; it stays. If it is removed, "
           @"the packaged default %@ comes back at the next launch.", seed];
+      case GTSSeedPolicyUnknown:
+        return [NSString stringWithFormat: @"The package mentions a default theme %@, but not how "
+          @"it is applied; its effect is unknown.", seed];
       case GTSSeedWrongDomain:
         return [NSString stringWithFormat: @"The package sets %@ in %@, which is not the settings "
           @"domain shown here; that default may not apply to this app.", seed, [self seedDomain]];

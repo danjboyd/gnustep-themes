@@ -15,7 +15,8 @@ typedef enum {
   GTSSidecarArtifactMissing,/* no AppImage at the path */
   GTSSidecarNameMismatch,   /* sidecar describes a differently named file */
   GTSSidecarHashMismatch,   /* same name, different bytes: AppImage changed */
-  GTSSidecarUnreadable      /* AppImage exists but could not be hashed */
+  GTSSidecarUnreadable,     /* AppImage exists but could not be hashed */
+  GTSSidecarCheckUnavailable/* no SHA-256 backend in this build: NOT checked */
 } GTSSidecarBinding;
 
 typedef enum {
@@ -32,7 +33,8 @@ typedef enum {
   GTSSeedAbsentWillApply,   /* key absent: AppRun writes the packaged value at next launch */
   GTSSeedInEffect,          /* stored value equals the packaged one */
   GTSSeedOverriddenByUser,  /* user chose another theme; it stays */
-  GTSSeedWrongDomain        /* seed domain differs from (or can't be matched to) the app's domain */
+  GTSSeedWrongDomain,       /* seed domain differs from (or can't be matched to) the app's domain */
+  GTSSeedPolicyUnknown      /* seed present but its policy is missing/unrecognised: effect unknown */
 } GTSSeededThemeState;
 
 @interface GTSSidecarTheme : NSObject
@@ -79,15 +81,19 @@ typedef enum {
 /* Binding to an AppImage file. nil path => sidecar dir + appimage.fileName. */
 - (NSString*) appImageFileName;
 - (NSString*) appImageSha256;
+/* Point-in-time check: "this metadata matches this file now". It says
+   nothing about the file at any later read. Only Bound means checked. */
 - (GTSSidecarBinding) bindingForAppImageAtPath: (NSString*)appImagePath;
 + (NSString*) descriptionOfBinding: (GTSSidecarBinding)b;
 
 /* App and domains. */
 - (NSString*) packageId;
 - (NSString*) runtimeDomainHint;          /* nil when unknown */
-- (NSString*) runtimeDomainHintSource;    /* bundleIdentifier | processName | unknown */
+- (NSString*) runtimeDomainHintSource;    /* bundleIdentifier | processName | unknown (anything else = unknown) */
 - (NSString*) seedDomain;                 /* nil when nothing is seeded */
-- (NSNumber*) seedDomainMatchesRuntimeHint; /* nil = unknown */
+/* Derived here from the two strings (nil = unknown); the producer's flag is
+   only cross-checked, and a contradictory/wrongly typed flag is a warning. */
+- (NSNumber*) seedDomainMatchesRuntimeHint;
 
 /* GSTheme sources. */
 - (NSString*) seededTheme;                /* value of the GSTheme seed, or nil */
@@ -100,7 +106,10 @@ typedef enum {
 - (GTSSidecarTheme*) themeNamed: (NSString*)name;
 
 /* How a seeded GSTheme looks given the value currently stored in the app's
-   domain (nil = absent). Pure; reads nothing. */
+   domain (nil = absent). App-domain seeding ONLY: this is not the effective
+   theme (global GSTheme, arguments etc. still come from the resolver).
+   Next-launch behaviour is promised only for the recognised policy
+   "each-launch-if-absent"; otherwise GTSSeedPolicyUnknown. Pure. */
 - (GTSSeededThemeState) seededThemeStateForStoredValue: (id)stored inDomain: (NSString*)domain;
 - (NSString*) descriptionOfSeededThemeState: (GTSSeededThemeState)s;
 /* "Remove" is not meaningful for a seeded key: AppRun writes it back at each

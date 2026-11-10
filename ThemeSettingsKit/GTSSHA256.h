@@ -1,7 +1,13 @@
-/* GTSSHA256.h - small SHA-256 (FIPS 180-4) for binding an AppImage to its
-   sidecar. gnustep-base 1.31 offers no SHA-256. Streams files in chunks. */
+/* GTSSHA256.h - SHA-256 for binding an AppImage to its sidecar, using a
+   maintained implementation detected at build time (GnuTLS: build with
+   -DGTS_HAVE_GNUTLS and link gnutls; see gts-config.make). Without one,
+   hashing is unavailable: every function returns nil and callers must treat
+   the binding as unchecked. Files are hashed in a streaming fashion. */
 #import <Foundation/Foundation.h>
 
-/* Lowercase hex digest of the data, or of the file (nil if unreadable). */
+BOOL GTSSHA256IsAvailable(void);
+/* Lowercase hex digest, or nil (unavailable backend / unreadable file). */
 NSString *GTSSHA256HexOfData(NSData *data);
 NSString *GTSSHA256HexOfFile(NSString *path);
+/* TESTING ONLY: behave as if no backend were built in. */
+void GTSSHA256SetDisabledForTesting(BOOL disabled);

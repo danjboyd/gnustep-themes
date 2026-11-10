@@ -267,6 +267,70 @@ inlineGumdrop(void)
     }
 }
 
+- (void) testDomainMatchIsDerivedAndProducerFlagCrossChecked
+{
+  NSMutableDictionary *d = [self sidecarFor: [appimage lastPathComponent] sha: GTSSHA256HexOfFile(appimage)];
+  GTSAppImageSidecar *s;
+  /* Producer claims a match, but the domains differ. */
+  [[d objectForKey: @"defaults"] setObject: @"org.example.Other" forKey: @"seedDomain"];
+  [self writeSidecar: d];
+  s = [GTSAppImageSidecar sidecarWithContentsOfFile: sidecar error: NULL];
+  XCTAssertEqualObjects([s seedDomainMatchesRuntimeHint], [NSNumber numberWithBool: NO], @"ours, not the producer's");
+  XCTAssertTrue([[[s warnings] componentsJoinedByString: @"|"] rangeOfString: @"says true"].location != NSNotFound,
+    @"%@", [s warnings]);
+  /* Wrongly typed flag: number 1 is not a JSON boolean. */
+  [[d objectForKey: @"defaults"] setObject: @"org.example.App" forKey: @"seedDomain"];
+  [[d objectForKey: @"defaults"] setObject: [NSNumber numberWithInt: 1] forKey: @"seedDomainMatchesRuntimeHint"];
+  [self writeSidecar: d];
+  s = [GTSAppImageSidecar sidecarWithContentsOfFile: sidecar error: NULL];
+  XCTAssertEqualObjects([s seedDomainMatchesRuntimeHint], [NSNumber numberWithBool: YES]);
+  XCTAssertTrue([[[s warnings] componentsJoinedByString: @"|"] rangeOfString: @"not a boolean"].location != NSNotFound);
+}
+
+- (void) testUnrecognisedHintSourceIsUnknown
+{
+  NSMutableDictionary *d = [self sidecarFor: [appimage lastPathComponent] sha: GTSSHA256HexOfFile(appimage)];
+  GTSAppImageSidecar *s;
+  [[d objectForKey: @"app"] setObject: @"guessedFromIcon" forKey: @"runtimeDomainHintSource"];
+  [self writeSidecar: d];
+  s = [GTSAppImageSidecar sidecarWithContentsOfFile: sidecar error: NULL];
+  XCTAssertEqualObjects([s runtimeDomainHintSource], @"unknown");
+  XCTAssertNil([s runtimeDomainHint]);
+  XCTAssertNil([s seedDomainMatchesRuntimeHint]);
+}
+
+- (void) testUnknownSeedPolicyPromisesNothing
+{
+  NSMutableDictionary *d = [self sidecarFor: [appimage lastPathComponent] sha: GTSSHA256HexOfFile(appimage)];
+  NSArray *policies = [NSArray arrayWithObjects: @"first-launch-only", [NSNull null], nil];
+  NSEnumerator *e = [policies objectEnumerator];
+  id pol;
+  while ((pol = [e nextObject]) != nil)
+    {
+      GTSAppImageSidecar *s;
+      [[d objectForKey: @"defaults"] setObject: [NSArray arrayWithObject:
+        [NSDictionary dictionaryWithObjectsAndKeys: @"GSTheme", @"key", @"Gumdrop", @"value", pol, @"policy", nil]]
+        forKey: @"seeds"];
+      [self writeSidecar: d];
+      s = [GTSAppImageSidecar sidecarWithContentsOfFile: sidecar error: NULL];
+      XCTAssertEqual([s seededThemeStateForStoredValue: nil inDomain: @"org.example.App"], GTSSeedPolicyUnknown, @"%@", pol);
+      XCTAssertEqual([s seededThemeStateForStoredValue: @"Gumdrop" inDomain: @"org.example.App"], GTSSeedPolicyUnknown);
+      XCTAssertTrue([s isRemovalMeaningfulForKey: @"GSTheme"], @"no each-launch promise, so no claim either way");
+      XCTAssertTrue([[s descriptionOfSeededThemeState: GTSSeedPolicyUnknown] rangeOfString: @"unknown"].location != NSNotFound);
+    }
+}
+
+- (void) testNoHashBackendMeansBindingNotChecked
+{
+  GTSAppImageSidecar *s = [self loadBound];
+  XCTAssertTrue(GTSSHA256IsAvailable(), @"this build links GnuTLS");
+  GTSSHA256SetDisabledForTesting(YES);
+  XCTAssertEqual([s bindingForAppImageAtPath: nil], GTSSidecarCheckUnavailable, @"never reported as Bound");
+  XCTAssertNil(GTSSHA256HexOfFile(appimage));
+  GTSSHA256SetDisabledForTesting(NO);
+  XCTAssertEqual([s bindingForAppImageAtPath: nil], GTSSidecarBound);
+}
+
 - (void) testUnknownRuntimeDomainIsNotGuessed
 {
   NSMutableDictionary *d = [self sidecarFor: [appimage lastPathComponent] sha: GTSSHA256HexOfFile(appimage)];
