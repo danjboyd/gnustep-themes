@@ -5,3 +5,4 @@ derived_src/
 Tests/RootProbe/obj/
 Tests/HostCheck/ThemeSettingsKit/
 Tests/HostCheck/ThemeSettingsUI/
+Tools/ValidateSchema/ThemeSettingsKit/
