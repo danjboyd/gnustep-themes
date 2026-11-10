@@ -1,0 +1,241 @@
+/* Sidecar reader (schema 1, provisional per packager draft PR #127). */
+#import "GTSTestSupport.h"
+#import "GTSAppImageSidecar.h"
+#import "GTSSHA256.h"
+#import "GTSThemeSettingsSchema.h"
+#import "GTSDefaultsDomainStore.h"
+
+@interface GTSAppImageSidecarTests : XCTestCase
+{
+  NSString *dir, *appimage, *sidecar;
+}
+@end
+
+static NSDictionary *
+inlineGumdrop(void)
+{
+  NSString *p = [GTSExamplesDir() stringByAppendingPathComponent: @"Gumdrop.theme/Resources/ThemeSettings.plist"];
+  return [[NSString stringWithContentsOfFile: p] propertyList];
+}
+
+@implementation GTSAppImageSidecarTests
+
+- (NSMutableDictionary*) sidecarFor: (NSString*)fileName sha: (NSString*)sha
+{
+  NSMutableDictionary *settingsInline = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+    @"inline", @"status", [NSNumber numberWithInt: 1], @"schemaVersion", inlineGumdrop(), @"inline",
+    [NSNull null], @"note", nil];
+  NSArray *themes = [NSArray arrayWithObjects:
+    [NSDictionary dictionaryWithObjectsAndKeys: @"Gumdrop", @"name", @"org.gnustep.themes.gumdrop", @"themeId",
+      @"ok", @"infoStatus", @"themeInputs", @"origin",
+      [NSDictionary dictionaryWithObjectsAndKeys: @"usr/GNUstep/System/Library/Themes/Gumdrop.theme", @"bundledPath",
+        @"ok", @"executableStatus", nil], @"installation",
+      settingsInline, @"settings", nil],
+    [NSDictionary dictionaryWithObjectsAndKeys: @"Big", @"name", [NSNull null], @"themeId", @"ok", @"infoStatus",
+      [NSDictionary dictionaryWithObjectsAndKeys: @"notInlined", @"status", [NSNull null], @"inline",
+        @"over 256 KiB; contents unavailable without reading the AppImage", @"note", nil], @"settings", nil],
+    [NSDictionary dictionaryWithObjectsAndKeys: @"Broken", @"name", @"ok", @"infoStatus",
+      [NSDictionary dictionaryWithObjectsAndKeys: @"malformed", @"status", @"parse error at line 3", @"note", nil], @"settings", nil],
+    [NSDictionary dictionaryWithObjectsAndKeys: @"Linked", @"name", @"unavailable", @"infoStatus",
+      [NSDictionary dictionaryWithObjectsAndKeys: @"unavailable", @"status", nil], @"settings", nil],
+    [NSDictionary dictionaryWithObjectsAndKeys: @"Plain", @"name", @"ok", @"infoStatus", [NSNull null], @"settings", nil],
+    [NSDictionary dictionaryWithObjectsAndKeys: @"Gone", @"name", @"missing", @"infoStatus",
+      [NSNull null], @"installation", [NSNull null], @"settings", nil],
+    nil];
+  return [NSMutableDictionary dictionaryWithObjectsAndKeys:
+    [NSNumber numberWithInt: 1], @"schema",
+    [NSDictionary dictionaryWithObjectsAndKeys: fileName, @"fileName", sha, @"sha256", nil], @"appimage",
+    [NSDictionary dictionaryWithObjectsAndKeys: @"org.example.App", @"id", nil], @"package",
+    [NSMutableDictionary dictionaryWithObjectsAndKeys: @"org.example.App", @"runtimeDomainHint",
+      @"bundleIdentifier", @"runtimeDomainHintSource", nil], @"app",
+    [NSMutableDictionary dictionaryWithObjectsAndKeys: @"org.example.App", @"seedDomain",
+      [NSNumber numberWithBool: YES], @"seedDomainMatchesRuntimeHint",
+      [NSArray arrayWithObject: [NSDictionary dictionaryWithObjectsAndKeys: @"GSTheme", @"key", @"Gumdrop", @"value",
+        @"each-launch-if-absent", @"policy", [NSNumber numberWithInt: 1], @"rank", nil]], @"seeds",
+      [NSArray arrayWithObject: [NSDictionary dictionaryWithObjectsAndKeys: @"GSTheme", @"key", @"Gumdrop", @"value",
+        @"ifUnset", @"policy", [NSNull null], @"rank", @"not read by gnustep-base/gui; informational only", @"effect", nil]], @"env",
+      nil], @"defaults",
+    themes, @"themes", nil];
+}
+
+- (NSString*) writeSidecar: (NSDictionary*)d
+{
+  NSData *j = [NSJSONSerialization dataWithJSONObject: d options: 0 error: NULL];
+  [j writeToFile: sidecar atomically: YES];
+  return sidecar;
+}
+
+- (void) setUp
+{
+  GTSRequireIsolatedDefaults();
+  dir = [[GTSTestRoot() stringByAppendingPathComponent: GTSUniqueDomain(@"appimage")] retain];
+  [[NSFileManager defaultManager] createDirectoryAtPath: dir withIntermediateDirectories: YES
+                                             attributes: nil error: NULL];
+  appimage = [[dir stringByAppendingPathComponent: @"App-1.2.3-x86_64.AppImage"] retain];
+  sidecar = [[dir stringByAppendingPathComponent: @"App-1.2.3-x86_64.themes.json"] retain];
+  /* Not a real AppImage: only its bytes are hashed, it is never run. */
+  [[@"fake appimage bytes" dataUsingEncoding: NSUTF8StringEncoding] writeToFile: appimage atomically: YES];
+}
+
+- (void) tearDown
+{
+  [dir release]; [appimage release]; [sidecar release];
+}
+
+- (GTSAppImageSidecar*) loadBound
+{
+  [self writeSidecar: [self sidecarFor: [appimage lastPathComponent] sha: GTSSHA256HexOfFile(appimage)]];
+  return [GTSAppImageSidecar sidecarWithContentsOfFile: sidecar error: NULL];
+}
+
+- (void) testSHA256KnownVectors
+{
+  XCTAssertEqualObjects(GTSSHA256HexOfData([NSData data]),
+    @"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+  XCTAssertEqualObjects(GTSSHA256HexOfData([@"abc" dataUsingEncoding: NSUTF8StringEncoding]),
+    @"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+  XCTAssertEqualObjects(GTSSHA256HexOfData([@"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"
+    dataUsingEncoding: NSUTF8StringEncoding]),
+    @"248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1");
+}
+
+- (void) testBoundSidecarFields
+{
+  GTSAppImageSidecar *s = [self loadBound];
+  XCTAssertNotNil(s);
+  XCTAssertEqual([s bindingForAppImageAtPath: nil], GTSSidecarBound);
+  XCTAssertEqualObjects([s runtimeDomainHint], @"org.example.App");
+  XCTAssertEqualObjects([s seedDomainMatchesRuntimeHint], [NSNumber numberWithBool: YES]);
+  XCTAssertEqualObjects([s seededTheme], @"Gumdrop");
+  XCTAssertEqualObjects([[[s envEntries] lastObject] objectForKey: @"effect"],
+    @"not read by gnustep-base/gui; informational only");
+  XCTAssertEqual([[s themes] count], (NSUInteger)6);
+}
+
+- (void) testSettingsStatusesAreExplicit
+{
+  GTSAppImageSidecar *s = [self loadBound];
+  GTSSidecarTheme *g = [s themeNamed: @"Gumdrop"];
+  XCTAssertEqual([g settingsStatus], GTSSettingsInline);
+  XCTAssertTrue([g isFullyDescribed]);
+  XCTAssertEqualObjects([[g schema] themeIdentifier], @"org.gnustep.themes.gumdrop");
+  XCTAssertEqual([[s themeNamed: @"Big"] settingsStatus], GTSSettingsNotInlined);
+  XCTAssertFalse([[s themeNamed: @"Big"] isFullyDescribed], @"too-large settings must not look complete");
+  XCTAssertNotNil([[s themeNamed: @"Big"] settingsNote]);
+  XCTAssertEqual([[s themeNamed: @"Broken"] settingsStatus], GTSSettingsMalformed);
+  XCTAssertEqual([[s themeNamed: @"Linked"] settingsStatus], GTSSettingsUnavailable);
+  XCTAssertEqual([[s themeNamed: @"Plain"] settingsStatus], GTSSettingsNone);
+  XCTAssertEqualObjects([[s themeNamed: @"Gone"] infoStatus], @"missing");
+  XCTAssertNil([[s themeNamed: @"Gone"] bundledPath]);
+  XCTAssertFalse([g isCompatibilityKnown], @"compatibility is never inferred from metadata");
+}
+
+- (void) testInvalidInlineSettingsAreNotDescribed
+{
+  NSMutableDictionary *d = [self sidecarFor: [appimage lastPathComponent] sha: GTSSHA256HexOfFile(appimage)];
+  NSMutableDictionary *t0 = [[[[d objectForKey: @"themes"] objectAtIndex: 0] mutableCopy] autorelease];
+  NSMutableDictionary *st = [[[t0 objectForKey: @"settings"] mutableCopy] autorelease];
+  GTSAppImageSidecar *s;
+  [st setObject: [NSDictionary dictionaryWithObject: @"7" forKey: @"SchemaVersion"] forKey: @"inline"];
+  [t0 setObject: st forKey: @"settings"];
+  [d setObject: [NSArray arrayWithObject: t0] forKey: @"themes"];
+  [self writeSidecar: d];
+  s = [GTSAppImageSidecar sidecarWithContentsOfFile: sidecar error: NULL];
+  XCTAssertFalse([[s themeNamed: @"Gumdrop"] isFullyDescribed]);
+  XCTAssertNotNil([[s themeNamed: @"Gumdrop"] schemaProblem]);
+}
+
+- (void) testChangedArtifactIsAHashMismatch
+{
+  GTSAppImageSidecar *s = [self loadBound];
+  [[@"rebuilt appimage" dataUsingEncoding: NSUTF8StringEncoding] writeToFile: appimage atomically: YES];
+  XCTAssertEqual([s bindingForAppImageAtPath: nil], GTSSidecarHashMismatch);
+  XCTAssertTrue([[GTSAppImageSidecar descriptionOfBinding: GTSSidecarHashMismatch]
+    rangeOfString: @"changed"].location != NSNotFound);
+}
+
+- (void) testMissingAndRenamedArtifacts
+{
+  GTSAppImageSidecar *s = [self loadBound];
+  NSString *other = [dir stringByAppendingPathComponent: @"Other.AppImage"];
+  [[NSData dataWithContentsOfFile: appimage] writeToFile: other atomically: YES];
+  XCTAssertEqual([s bindingForAppImageAtPath: other], GTSSidecarNameMismatch,
+    @"same bytes under another name are not bound");
+  [[NSFileManager defaultManager] removeFileAtPath: appimage handler: nil];
+  XCTAssertEqual([s bindingForAppImageAtPath: nil], GTSSidecarArtifactMissing);
+}
+
+- (void) testRejectsUnboundOrFutureSidecars
+{
+  NSError *err = nil;
+  NSMutableDictionary *d = [self sidecarFor: [appimage lastPathComponent] sha: GTSSHA256HexOfFile(appimage)];
+  [d setObject: [NSNumber numberWithInt: 2] forKey: @"schema"];
+  [self writeSidecar: d];
+  XCTAssertNil([GTSAppImageSidecar sidecarWithContentsOfFile: sidecar error: &err]);
+  XCTAssertEqual([err code], (NSInteger)GTSErrorUnsupportedVersion);
+
+  d = [self sidecarFor: @"../escape.AppImage" sha: GTSSHA256HexOfFile(appimage)];
+  [self writeSidecar: d];
+  XCTAssertNil([GTSAppImageSidecar sidecarWithContentsOfFile: sidecar error: NULL], @"path in fileName");
+
+  d = [self sidecarFor: [appimage lastPathComponent] sha: @"not-a-hash"];
+  [self writeSidecar: d];
+  XCTAssertNil([GTSAppImageSidecar sidecarWithContentsOfFile: sidecar error: NULL]);
+
+  [@"{ not json" writeToFile: sidecar atomically: YES];
+  XCTAssertNil([GTSAppImageSidecar sidecarWithContentsOfFile: sidecar error: &err]);
+  XCTAssertEqual([err code], (NSInteger)GTSErrorInvalidSchema);
+}
+
+- (void) testUnknownRuntimeDomainIsNotGuessed
+{
+  NSMutableDictionary *d = [self sidecarFor: [appimage lastPathComponent] sha: GTSSHA256HexOfFile(appimage)];
+  GTSAppImageSidecar *s;
+  [[d objectForKey: @"app"] setObject: @"unknown" forKey: @"runtimeDomainHintSource"];
+  [[d objectForKey: @"app"] setObject: [NSNull null] forKey: @"runtimeDomainHint"];
+  [[d objectForKey: @"defaults"] setObject: [NSNull null] forKey: @"seedDomainMatchesRuntimeHint"];
+  [self writeSidecar: d];
+  s = [GTSAppImageSidecar sidecarWithContentsOfFile: sidecar error: NULL];
+  XCTAssertNil([s runtimeDomainHint]);
+  XCTAssertNil([s seedDomainMatchesRuntimeHint], @"unknown, not false and not true");
+}
+
+/* AppRun: on every launch, `defaults read <domain> GSTheme`; write the
+   packaged value only if absent. Walk several launches. */
+- (void) testSeededThemeAcrossRepeatedLaunches
+{
+  GTSAppImageSidecar *s = [self loadBound];
+  NSString *dom = @"org.example.App", *stored = nil;
+  int launch;
+  XCTAssertEqual([s seededThemeStateForStoredValue: stored inDomain: dom], GTSSeedAbsentWillApply);
+  for (launch = 0; launch < 3; launch++)
+    {
+      if (stored == nil) stored = [s seededTheme];     /* what AppRun does */
+      XCTAssertEqual([s seededThemeStateForStoredValue: stored inDomain: dom], GTSSeedInEffect);
+    }
+  stored = @"Adwaita";                                   /* user picks another theme */
+  XCTAssertEqual([s seededThemeStateForStoredValue: stored inDomain: dom], GTSSeedOverriddenByUser);
+  if (stored == nil) stored = [s seededTheme];          /* next launch: untouched */
+  XCTAssertEqualObjects(stored, @"Adwaita");
+  stored = nil;                                          /* user removes the key */
+  XCTAssertEqual([s seededThemeStateForStoredValue: stored inDomain: dom], GTSSeedAbsentWillApply);
+  if (stored == nil) stored = [s seededTheme];          /* next launch: it is back */
+  XCTAssertEqual([s seededThemeStateForStoredValue: stored inDomain: dom], GTSSeedInEffect);
+  XCTAssertFalse([s isRemovalMeaningfulForKey: @"GSTheme"]);
+  XCTAssertTrue([s isRemovalMeaningfulForKey: @"GumdropMenuStyle"]);
+  XCTAssertTrue([[s descriptionOfSeededThemeState: GTSSeedInEffect]
+    rangeOfString: @"each launch"].location != NSNotFound);
+  XCTAssertEqual([s seededThemeStateForStoredValue: @"Gumdrop" inDomain: @"App"], GTSSeedWrongDomain);
+}
+
+- (void) testReaderWritesNoDefaults
+{
+  NSString *root = [GTSDefaultsDomainStore defaultsRoot];
+  NSArray *before = [[NSFileManager defaultManager] directoryContentsAtPath: root];
+  GTSAppImageSidecar *s = [self loadBound];
+  [s bindingForAppImageAtPath: nil];
+  [s seededThemeStateForStoredValue: nil inDomain: @"org.example.App"];
+  XCTAssertEqualObjects([[[NSFileManager defaultManager] directoryContentsAtPath: root]
+    sortedArrayUsingSelector: @selector(compare:)], [before sortedArrayUsingSelector: @selector(compare:)]);
+}
+@end
