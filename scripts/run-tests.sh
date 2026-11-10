@@ -90,6 +90,7 @@ leader_exited() {   # reapable without blocking: gone or zombie
 
 finish() {
   status=$1
+  set +e
   trap '' INT TERM
   trap - EXIT
   clean=1

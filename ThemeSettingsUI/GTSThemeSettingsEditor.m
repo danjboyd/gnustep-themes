@@ -11,7 +11,7 @@
 - (BOOL) isFlipped { return YES; }
 @end
 
-static const float kMargin = 16, kLabelW = 190, kControlW = 260, kResetW = 70, kGap = 8;
+static const float kMargin = 16, kLabelW = 170, kControlW = 330, kResetW = 70, kGap = 8;
 
 static NSTextField *
 label(NSString *text, float size, BOOL bold, NSColor *color)

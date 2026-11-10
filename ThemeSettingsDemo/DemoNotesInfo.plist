@@ -1,0 +1,7 @@
+{
+  ApplicationName = "Demo Notes";
+  CFBundleIdentifier = "org.gnustep.themesettings.DemoNotes";
+  NSExecutable = DemoNotes;
+  NSPrincipalClass = NSApplication;
+  GumdropMenuStyle = menubar;
+}

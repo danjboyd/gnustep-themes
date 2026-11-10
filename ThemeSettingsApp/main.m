@@ -15,6 +15,7 @@
   GTSThemeSettingsEditor *_editor;
   NSInteger _lastTarget;
 }
+- (BOOL) selectApplicationAtPath: (NSString*)path;
 @end
 
 @implementation GTSConfigurator
@@ -48,7 +49,7 @@
 - (void) applicationDidFinishLaunching: (NSNotification*)n
 {
   NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
-  NSRect frame = NSMakeRect(100, 100, 600, 640);
+  NSRect frame = NSMakeRect(100, 100, 660, 680);
   NSView *content, *ev;
   NSTextField *l;
   NSEnumerator *e;
@@ -88,8 +89,19 @@
   [content addSubview: ev];
 
   preset = [ud stringForKey: @"GTSTargetApp"];     /* optional: start on an app */
-  if ([preset length] > 0)
-    [self selectApplicationAtPath: preset];
+  if ([preset length] > 0 && [self selectApplicationAtPath: preset])
+    {
+      NSUInteger i = [_appPaths indexOfObject: preset];
+      if (i == NSNotFound)
+        {
+          [_appPaths addObject: preset];
+          [_target insertItemWithTitle: [[preset lastPathComponent] stringByDeletingPathExtension]
+                               atIndex: [_appPaths count]];
+          i = [_appPaths count] - 1;
+        }
+      _lastTarget = i + 1;
+      [_target selectItemAtIndex: _lastTarget];
+    }
   else
     [_model setTargetGlobal];
   [_editor reloadFromModel];
