@@ -226,6 +226,9 @@ stateText(GTSResolvedValue *v, BOOL global)
     [parts addObject: [NSString stringWithFormat: @"Shown read-only: this theme requires %@, "
       @"which this version of the settings editor does not understand.",
       [[[r schema] unsupportedFeatures] componentsJoinedByString: @", "]]];
+  /* Metadata says nothing about whether the theme's code was built for this
+     app's GNUstep; never imply it was (lead 21062). */
+  [parts addObject: @"Whether this theme's code matches the app's GNUstep version is not checked here."];
   if ([[r shadowedRecords] count] > 0)
     [parts addObject: [NSString stringWithFormat: @"Overrides %lu other installed copy(ies): %@",
       (unsigned long)[[r shadowedRecords] count],
