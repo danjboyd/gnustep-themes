@@ -1,6 +1,7 @@
 /* GTSAppImageSidecar.h - reads gnustep-packager's <artifact-base>.themes.json
-   (sidecar schema 1, PROVISIONAL: draft PR danjboyd/gnustep-packager#127,
-   docs/appimage-theme-metadata.md at 161cfc7, source-reviewed; earlier ec63a8c). Foundation only.
+   (sidecar schema 1 as merged in danjboyd/gnustep-packager main 776cb2e,
+   PR #127, docs/appimage-theme-metadata.md; identical to reviewed head
+   161cfc7. No packager release carries it yet). Foundation only.
 
    Never runs, mounts or loads anything from the AppImage: the sidecar is the
    only input, and the AppImage file is only hashed to check the binding.
