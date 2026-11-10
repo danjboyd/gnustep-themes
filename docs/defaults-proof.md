@@ -7,7 +7,8 @@ the shared base 6479d4483 / gui 9bd1123a1.
 Run: `scripts/run-tests.sh` (creates a 0700 scratch root, 0600 config files,
 sets `GNUSTEP_CONFIG_FILE`, aborts if `GSDefaultsRootForUser()` is not under
 it). External reads/writes go through `/usr/bin/defaults` as a separate
-process. Result: 40/40 tests pass, stable over repeated runs.
+process. Result: all tests pass (48 at 2026-11-10 late morning), stable over
+repeated runs. Self-run only; not yet independently reviewed.
 
 ## Findings
 
@@ -33,6 +34,15 @@ process. Result: 40/40 tests pass, stable over repeated runs.
    `testResidualRaceSameKeyLastWriterWins` pins this behaviour.
 5. Reset removes exactly one key; unrelated keys and values for inactive themes
    are untouched (tests in `GTSDefaultsDomainStoreTests`, `GTSEditSessionTests`).
+6. "All-or-nothing" applies only to conflicts **observed before commit**: if
+   any staged key moved since the baseline, nothing is written. Once the check
+   passes, the write is a normal GNUstep `-synchronize`, not a transaction.
+
+Shared base 6479d4483 source review (gnustep owner, msgs 20811/20812) agrees
+with finding 1: `GNUSTEP_CONFIG_FILE` is read from the environment;
+`GNUSTEP_USER_CONFIG_FILE` comes only from the master config; the config
+parser rejects group/other-writable files. The actual resolved-root assertion
+remains the safety criterion.
 
 ## Limits
 

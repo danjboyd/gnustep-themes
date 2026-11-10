@@ -12,7 +12,7 @@
   NSString *_domain;
   GTSDomainSnapshot *_baseline;
   NSMutableDictionary *_staged;    /* key -> value or GTSRemoveValue */
-  NSMutableSet *_restartKeys;
+  NSMutableDictionary *_applyByKey;  /* key -> NSNumber(GTSApplyPolicy) */
 }
 - (id) initWithStore: (GTSDefaultsDomainStore*)store domain: (NSString*)domain;
 - (NSString*) domain;
@@ -33,7 +33,10 @@
 
 - (BOOL) hasChanges;
 - (NSDictionary*) stagedChanges;
-/* YES if any staged setting has Apply = restart (or GSTheme changed). */
+/* Strongest Apply requirement among staged keys (GSTheme counts as
+   restart). GTSApplyLive when nothing is staged. */
+- (int) applyRequirement;
+/* applyRequirement == GTSApplyRestart */
 - (BOOL) needsRestart;
 
 /* Commit. On conflict nothing is written, staged changes are kept, and

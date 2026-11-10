@@ -240,10 +240,11 @@ static NSArray *knownSources = nil;
 
   o = [p objectForKey: @"Apply"];
   if ([o isEqual: @"live"]) d->_apply = GTSApplyLive;
+  else if ([o isEqual: @"newWindows"]) d->_apply = GTSApplyNewWindows;
   else if ([o isEqual: @"restart"]) d->_apply = GTSApplyRestart;
   else
     {
-      [problems addObject: [NSString stringWithFormat: @"%@: Apply must be live or restart", where]];
+      [problems addObject: [NSString stringWithFormat: @"%@: Apply must be live, newWindows or restart", where]];
       return nil;
     }
 

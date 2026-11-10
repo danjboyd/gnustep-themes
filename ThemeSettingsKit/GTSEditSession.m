@@ -19,7 +19,7 @@ same(id a, id b)
       _store = [store retain];
       _domain = [domain copy];
       _staged = [[NSMutableDictionary alloc] init];
-      _restartKeys = [[NSMutableSet alloc] init];
+      _applyByKey = [[NSMutableDictionary alloc] init];
       _baseline = [[store snapshotForDomain: domain] retain];
     }
   return self;
@@ -28,7 +28,7 @@ same(id a, id b)
 - (void) dealloc
 {
   [_store release]; [_domain release]; [_baseline release];
-  [_staged release]; [_restartKeys release];
+  [_staged release]; [_applyByKey release];
   [super dealloc];
 }
 
@@ -37,13 +37,22 @@ same(id a, id b)
 - (NSDictionary*) stagedChanges { return [[_staged copy] autorelease]; }
 - (BOOL) hasChanges { return [_staged count] > 0; }
 
-- (BOOL) needsRestart
+- (int) applyRequirement
 {
   NSEnumerator *e = [_staged keyEnumerator];
   NSString *k;
+  int req = GTSApplyLive;
   while ((k = [e nextObject]) != nil)
-    if ([_restartKeys containsObject: k]) return YES;
-  return NO;
+    {
+      int r = [[_applyByKey objectForKey: k] intValue];
+      if (r > req) req = r;
+    }
+  return req;
+}
+
+- (BOOL) needsRestart
+{
+  return [self applyRequirement] == GTSApplyRestart;
 }
 
 - (GTSDomainSnapshot*) pendingSnapshot
@@ -60,14 +69,14 @@ same(id a, id b)
   return [[[GTSDomainSnapshot alloc] initWithDomainName: _domain values: d] autorelease];
 }
 
-- (void) stage: (id)v key: (NSString*)key restart: (BOOL)restart
+- (void) stage: (id)v key: (NSString*)key apply: (int)apply
 {
   id base = [_baseline objectForKey: key];
   if ((v == GTSRemoveValue && base == nil) || same(v, base))
     [_staged removeObjectForKey: key];   /* back to baseline: nothing to do */
   else
     [_staged setObject: v forKey: key];
-  if (restart) [_restartKeys addObject: key];
+  [_applyByKey setObject: [NSNumber numberWithInt: apply] forKey: key];
 }
 
 - (BOOL) stageValue: (id)value
@@ -81,18 +90,18 @@ same(id a, id b)
       return NO;
     }
   [self stage: [s storedFormOfValue: value] key: [s key]
-      restart: [s applyPolicy] == GTSApplyRestart];
+        apply: [s applyPolicy]];
   return YES;
 }
 
 - (void) stageResetForSetting: (GTSSettingDescriptor*)s
 {
-  [self stage: GTSRemoveValue key: [s key] restart: [s applyPolicy] == GTSApplyRestart];
+  [self stage: GTSRemoveValue key: [s key] apply: [s applyPolicy]];
 }
 
 - (void) stageThemeSelection: (NSString*)name
 {
-  [self stage: (name ? (id)name : (id)GTSRemoveValue) key: @"GSTheme" restart: YES];
+  [self stage: (name ? (id)name : (id)GTSRemoveValue) key: @"GSTheme" apply: GTSApplyRestart];
 }
 
 - (void) discardChanges

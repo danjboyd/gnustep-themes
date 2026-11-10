@@ -34,9 +34,11 @@ typedef enum {
   GTSUnsetDynamic   /* absence is decided at runtime; never a stored token */
 } GTSUnsetBehavior;
 
+/* Ordered weakest to strongest requirement. */
 typedef enum {
-  GTSApplyRestart,
-  GTSApplyLive
+  GTSApplyLive = 0,        /* theme observes the change in running apps */
+  GTSApplyNewWindows = 1,  /* windows/panels/menus created after the change */
+  GTSApplyRestart = 2      /* only a relaunch is guaranteed to show it */
 } GTSApplyPolicy;
 
 /* One entry of a setting's Precedence list. */
