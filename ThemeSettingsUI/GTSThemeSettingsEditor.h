@@ -10,7 +10,7 @@
 - (void) themeSettingsEditorDidApply: (GTSThemeSettingsEditor*)editor;
 @end
 
-@interface GTSThemeSettingsEditor : NSObject
+@interface GTSThemeSettingsEditor : NSObject <NSTextFieldDelegate>
 {
   GTSEditorModel *_model;
   NSView *_view;              /* root view handed to the host */
@@ -29,6 +29,7 @@
 - (void) reloadFromModel;
 /* Drives the editor's own controls the way a user would, for scripted
    screenshots and GUI checks. Actions: "choose <settingId> <value>",
+   "type <settingId> <text>" (types into the field, does NOT commit),
    "reset <settingId>", "theme <name>", "apply", "cancel", "reload".
    Returns NO if the control is missing or disabled. */
 - (BOOL) performScriptedAction: (NSString*)action;

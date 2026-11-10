@@ -2,10 +2,13 @@
 # Renders review screenshots of the standalone configurator and the in-app
 # pane on a PRIVATE Xvfb display with ISOLATED defaults.
 #   scripts/screenshots.sh <output-dir>
-# Safety: a fresh display number chosen by Xvfb itself (-displayfd); the
-# defaults root is verified (read-only probe) before any app starts; every
-# process started here carries GTS_TEST_ROOT=<scratch> and only processes
-# that carry it (and started after this script) are stopped afterwards.
+# Safety: the first free display number from :200, accepted only once the
+# X lock file names OUR Xvfb pid; the defaults root is verified (read-only
+# probe) before any app starts; every process started here carries
+# GTS_TEST_ROOT=<scratch>. Cleanup records pid:starttime for marked
+# processes and rechecks start time + exact marker right before each
+# signal; anything left keeps the scratch config and fails the run.
+#   GTS_SHOTS_ONLY=A runs only scenario A (startup/cleanup validation).
 set -eu
 here=$(cd "$(dirname "$0")/.." && pwd)
 out=${1:?usage: screenshots.sh <output-dir>}
@@ -18,22 +21,35 @@ root=$(mktemp -d "${GTS_SCRATCH:-${TMPDIR:-/tmp}}/gts-shots.XXXXXX") || fail "no
 chmod 700 "$root"; root=$(cd "$root" && pwd -P)
 xvfb=""
 
-mine() {   # pids carrying our marker (any session: helpers such as gdnc daemonize)
+proc_start() { sed -n 's/^.*) [A-Za-z] \([^ ]* \)\{18\}\([0-9]*\).*/\2/p' "/proc/$1/stat" 2>/dev/null; }
+proc_state() { sed -n 's/^.*) \([A-Za-z]\).*/\1/p' "/proc/$1/stat" 2>/dev/null; }
+has_marker() { { tr '\0' '\n' < "/proc/$1/environ"; } 2>/dev/null | grep -qxF -- "GTS_TEST_ROOT=$root"; }
+mine() {   # "pid:start" of live processes carrying our marker (helpers such as gdnc daemonize)
   for p in $(ps -u "$(id -u)" -o pid=); do
     [ "$p" = "$$" ] && continue
-    if { tr '\0' '\n' < "/proc/$p/environ"; } 2>/dev/null | grep -qxF -- "GTS_TEST_ROOT=$root"; then
-      echo "$p"
-    fi
+    [ "$(proc_state "$p")" = Z ] && continue
+    has_marker "$p" || continue
+    ps0=$(proc_start "$p"); [ -n "$ps0" ] && echo "$p:$ps0"
+  done
+  return 0
+}
+signal_verified() {   # SIG records... ; re-check identity right before each signal
+  sig=$1; shift
+  for rec in "$@"; do
+    p=${rec%%:*}; ps0=${rec#*:}
+    [ "$(proc_start "$p")" = "$ps0" ] && has_marker "$p" && kill "-$sig" "$p" 2>/dev/null
   done
   return 0
 }
 finish() {
   st=$1; set +e; trap '' INT TERM; trap - EXIT
-  pids=$(mine); [ -n "$pids" ] && kill -TERM $pids 2>/dev/null
-  [ -n "$xvfb" ] && kill -TERM "$xvfb" 2>/dev/null
-  sleep 1
-  pids=$(mine); [ -n "$pids" ] && kill -KILL $pids 2>/dev/null
-  [ -n "$xvfb" ] && { kill -KILL "$xvfb" 2>/dev/null; wait "$xvfb" 2>/dev/null; }
+  signal_verified TERM $(mine)          # includes Xvfb: it carries the marker too
+  n=0; while [ -n "$(mine)" ] && [ $n -lt 30 ]; do sleep 0.1; n=$((n+1)); done
+  signal_verified KILL $(mine)
+  sleep 0.5
+  if [ -n "$xvfb" ] && [ "$(proc_state "$xvfb")" = Z -o -z "$(proc_state "$xvfb")" ]; then
+    wait "$xvfb" 2>/dev/null
+  fi
   if [ -n "$(mine)" ]; then
     echo "screenshots: KEEPING $root, processes remain: $(mine | tr '\n' ' ')" >&2; st=1
   else
@@ -83,8 +99,16 @@ while [ -e "/tmp/.X11-unix/X$dpy" ] || [ -e "/tmp/.X$dpy-lock" ]; do
 done
 Xvfb ":$dpy" -screen 0 1280x900x24 -nolisten tcp >/dev/null 2>&1 &
 xvfb=$!
-n=0; while [ ! -e "/tmp/.X11-unix/X$dpy" ] && [ $n -lt 50 ]; do sleep 0.1; n=$((n+1)); done
-kill -0 "$xvfb" 2>/dev/null && [ -e "/tmp/.X11-unix/X$dpy" ] || fail "Xvfb did not start on :$dpy"
+# Ready = our Xvfb is alive AND the display lock names our pid AND the
+# socket exists. A racing server on the same number fails the lock check.
+n=0; ready=0
+while [ $n -lt 50 ]; do
+  [ -n "$(proc_state "$xvfb")" ] && [ "$(proc_state "$xvfb")" != Z ] || fail "Xvfb exited during startup on :$dpy"
+  lockpid=$({ tr -dc '0-9' < "/tmp/.X$dpy-lock"; } 2>/dev/null || true)
+  if [ "$lockpid" = "$xvfb" ] && [ -S "/tmp/.X11-unix/X$dpy" ]; then ready=1; break; fi
+  sleep 0.1; n=$((n+1))
+done
+[ "$ready" -eq 1 ] || fail "Xvfb :$dpy not ready (lock pid ${lockpid:-none}, ours $xvfb)"
 echo "screenshots: private display :$dpy"
 export DISPLAY=":$dpy"
 
@@ -101,8 +125,11 @@ check() {   # domain key expected label
 }
 checkfail=0
 
+if [ "${GTS_SHOTS_ONLY:-}" != F ]; then
 # A. standalone, global target
 run "$APP" $X -GTSScreenshot "$out/A-standalone-global.png"
+
+[ "${GTS_SHOTS_ONLY:-}" = A ] && { ls "$out"; exit 0; }
 
 # B. standalone, app target: explicit vs inherited vs Info.plist; stage, Apply, receipt
 run "$APP" $X -GTSTargetApp "$root/apps/Writer.app" -GTSScript \
@@ -120,6 +147,17 @@ D write org.gnustep.themesettings.DemoNotes GSTheme Adwaita
 run "$DEMO" $X -GTSOpenSettings YES -GTSScript \
   "choose adwaita.header-bar-toolbar YES; apply; log; shot $out/D-pane-live-receipt.png"
 check org.gnustep.themesettings.DemoNotes GnomeThemeHeaderBarToolbar YES "D Apply wrote a live setting"
+
+fi
+# F. free-form field: text typed but not committed must be saved by Apply;
+#    invalid text must block the save (Apply enabled by typing alone).
+fpane() { run "$DEMO" $X -GTSOpenSettings YES -GTSScript "$1"; }
+D write org.gnustep.themesettings.DemoNotes GSTheme Adwaita
+fpane "type adwaita.font-scale 1.25; shot $out/F1-typed-uncommitted.png; apply; log"
+check org.gnustep.themesettings.DemoNotes GnomeFontScale 1.25 "F typed text committed by Apply"
+fpane "type adwaita.font-scale 3; apply; log; shot $out/F2-invalid-blocked.png"
+check org.gnustep.themesettings.DemoNotes GnomeFontScale 1.25 "F invalid text did not save"
+[ "${GTS_SHOTS_ONLY:-}" = F ] && { grep -h "^script:" "$root/apps.log"; [ "$checkfail" -eq 0 ] || fail "read-back checks failed"; exit 0; }
 
 # E. unreadable target domain: refused, nothing editable, file untouched
 mkdir -p "$root/apps/Locked.app/Resources"

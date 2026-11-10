@@ -40,6 +40,9 @@ wrappedHeight(NSString *text, float width, float size)
 
 @interface GTSThemeSettingsEditor (Private)
 - (NSView*) firstPopup;
+- (void) refreshButtons;
+- (NSArray*) editableFields;
+- (BOOL) stagePendingText;
 @end
 
 @implementation GTSThemeSettingsEditor
@@ -191,6 +194,7 @@ wrappedHeight(NSString *text, float width, float size)
           [f setTag: i];
           [f setTarget: self];
           [f setAction: @selector(textChanged:)];
+          [f setDelegate: self];          /* stage on every keystroke, see controlTextDidChange: */
           [f setEnabled: rowEditable];
           [_content addSubview: f];
         }
@@ -231,9 +235,60 @@ wrappedHeight(NSString *text, float width, float size)
 
   [_content setFrameSize: NSMakeSize(width, y + kMargin)];
   [_content setNeedsDisplay: YES];
+  [self refreshButtons];
+}
+
+/* Message + button state only; never rebuilds the rows, so an active
+   field editor survives. */
+- (void) refreshButtons
+{
   [_message setStringValue: [_model message] ? [_model message] : @""];
-  [_apply setEnabled: editable && [_model hasChanges]];
+  [_apply setEnabled: [_model isEditable] && [_model hasChanges]];
   [_cancel setEnabled: [_model hasChanges]];
+}
+
+/* Editable free-form fields (labels are NSTextFields too, but not editable). */
+- (NSArray*) editableFields
+{
+  NSMutableArray *a = [NSMutableArray array];
+  NSEnumerator *e = [[_content subviews] objectEnumerator];
+  NSView *v;
+  while ((v = [e nextObject]) != nil)
+    if ([v isKindOfClass: [NSTextField class]] && [(NSTextField*)v isEditable])
+      [a addObject: v];
+  return a;
+}
+
+/* Text currently shown in a field, including uncommitted field-editor text. */
+static NSString *
+fieldText(NSTextField *f)
+{
+  NSText *ed = [f currentEditor];
+  return ed ? [ed string] : [f stringValue];
+}
+
+/* Stage what every free-form field shows. NO if any value is invalid
+   (the model's message says why); nothing is staged for that field. */
+- (BOOL) stagePendingText
+{
+  NSEnumerator *e = [[self editableFields] objectEnumerator];
+  NSTextField *f;
+  BOOL ok = YES;
+  while ((f = [e nextObject]) != nil)
+    {
+      GTSSettingRow *row = [_rows objectAtIndex: [f tag]];
+      NSString *now = fieldText(f), *was = [row text] ? [row text] : @"";
+      if (![now isEqual: was] && ![_model setText: now forRow: row])
+        ok = NO;
+    }
+  return ok;
+}
+
+- (void) controlTextDidChange: (NSNotification*)n
+{
+  NSTextField *f = [n object];
+  [_model setText: fieldText(f) forRow: [_rows objectAtIndex: [f tag]]];
+  [self refreshButtons];
 }
 
 - (NSControl*) controlOfClass: (Class)c tag: (NSInteger)tag title: (NSString*)title
@@ -278,6 +333,24 @@ wrappedHeight(NSString *text, float width, float size)
       if (i == NSNotFound || p == nil || ![p isEnabled]) return NO;
       [p selectItemAtIndex: i];
       [p sendAction: [p action] to: [p target]];
+      return YES;
+    }
+  if ([verb isEqual: @"type"] && [w count] >= 3)
+    {
+      /* Click into the field and type, leaving the edit uncommitted. */
+      NSInteger r = [self rowIndexForSetting: [w objectAtIndex: 1]];
+      NSString *text = [[w subarrayWithRange: NSMakeRange(2, [w count] - 2)] componentsJoinedByString: @" "];
+      NSEnumerator *e = [[self editableFields] objectEnumerator];
+      NSTextField *f = nil, *x;
+      NSText *ed;
+      while ((x = [e nextObject]) != nil)
+        if ([x tag] == r) f = x;
+      if (r < 0 || f == nil || ![f isEnabled]) return NO;
+      [[_view window] makeFirstResponder: f];
+      ed = [f currentEditor];
+      if (ed == nil) return NO;
+      [ed selectAll: nil];
+      [ed insertText: text];
       return YES;
     }
   if (([verb isEqual: @"choose"] && [w count] >= 3) || ([verb isEqual: @"reset"] && [w count] == 2))
@@ -350,7 +423,16 @@ wrappedHeight(NSString *text, float width, float size)
 
 - (void) apply: (id)sender
 {
-  BOOL ok = [_model apply];
+  BOOL ok;
+  /* Commit whatever is being typed before saving: end editing, then stage
+     every field's visible text. An invalid entry stops the save. */
+  [[_view window] makeFirstResponder: nil];
+  if (![self stagePendingText])
+    {
+      [self refreshButtons];
+      return;
+    }
+  ok = [_model apply];
   [self reloadFromModel];
   if (ok && _delegate != nil
     && [_delegate respondsToSelector: @selector(themeSettingsEditorDidApply:)])
