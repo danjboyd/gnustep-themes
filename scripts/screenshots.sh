@@ -9,7 +9,8 @@
 # processes and rechecks start time + exact marker right before each
 # signal; anything left keeps the scratch config and fails the run.
 #   GTS_SHOTS_ONLY=A runs only scenario A (startup/cleanup validation);
-#   =F only the free-form scenario; =G only the AppImage-target scenario.
+#   =F only the free-form scenario; =G only the AppImage-target scenario;
+#   =H only the editor callback host check (Tests/HostCheck).
 set -eu
 here=$(cd "$(dirname "$0")/.." && pwd)
 out=${1:?usage: screenshots.sh <output-dir>}
@@ -125,6 +126,21 @@ check() {   # domain key expected label
   else echo "CHECK FAILED: $4 ($1 $2 = ${got:-<absent>}, want ${3:-<absent>})"; checkfail=1; fi
 }
 checkfail=0
+
+# H. Callback contract of the real editor in a disposable AppKit host
+#    (Tests/HostCheck): capture, order, nested Apply, exception reset,
+#    invalid pending text. Checks only; no screenshots.
+if [ "${GTS_SHOTS_ONLY:-}" = H ]; then
+  make -s -C "$here/Tests/HostCheck" messages=no >/dev/null || fail "host check build failed"
+  D write org.example.HostCheck GSTheme Adwaita
+  hst=0
+  timeout 90 "$here/Tests/HostCheck/obj/gts-host-check" $X -GTSHostDomain org.example.HostCheck \
+    >>"$root/apps.log" 2>&1 || hst=$?
+  grep -h "^CHECK\|^host-check:" "$root/apps.log"
+  echo "screenshots: host check exit status $hst"
+  [ "$hst" -eq 0 ] || fail "host check failed"
+  exit 0
+fi
 
 # G. AppImage targets (read-only): a bound sidecar and one whose AppImage is
 #    missing. The "AppImage" is a plain file: it is only hashed, never run.

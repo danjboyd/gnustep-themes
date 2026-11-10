@@ -271,8 +271,11 @@ wrappedHeight(NSString *text, float width, float size)
 static NSString *
 fieldText(NSTextField *f)
 {
+  /* Copy: the field editor's string is live storage and is emptied when
+     editing ends (makeFirstResponder: nil), which would turn the typed text
+     into "" -- i.e. a Reset -- before the model sees it. */
   NSText *ed = [f currentEditor];
-  return ed ? [ed string] : [f stringValue];
+  return [[(ed ? [ed string] : [f stringValue]) copy] autorelease];
 }
 
 /* Stage what every free-form field shows. NO if any value is invalid

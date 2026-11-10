@@ -50,6 +50,7 @@ only; visual review of the screenshots has not been done independently.
 | Free-form field commit on Apply | 8b1be21 | scenario F | yes (#21198) |
 | AppImage sidecar reader | 8adc88e (aligned 5c50e75, pinned a410c52) | 19 sidecar tests | yes (#21531) |
 | Read-only AppImage targets in the editor | 62570a2 | 101/101 model tests; scenario G used a stand-in artifact and predates the final text | yes (#21659) |
+| Editor Apply callback contract in a real AppKit host (+ fix: typed text was read from live field-editor storage, so invalid text became a Reset that deleted the stored value) | see git log | scenario H, `Tests/HostCheck`: 14 checks on private Xvfb, negative control fails without the fix | pending |
 
 ## Unresolved proof gaps
 

@@ -76,7 +76,10 @@ GTSThemeSettingsEditor *editor = [[GTSThemeSettingsEditor alloc] initWithModel: 
   - The outcome object is captured before either callback runs. A host that
     edits or switches target inside a callback clears
     `[model lastApplyOutcome]`, but not the object it was handed.
-  - Apply re-entered from a callback is ignored.
+  - Apply re-entered from a callback is ignored. A delegate exception
+    propagates to the caller; the editor stays usable for a later Apply.
+  - Verified in a real AppKit host by `Tests/HostCheck` (scenario H in
+    `scripts/screenshots.sh`, private Xvfb, scratch defaults).
   - Example: `ThemeSettingsDemo/main.m` logs kind, write, reload-needed and
     requirement; a real app might offer "Restart now" when the requirement
     is restart.
@@ -135,8 +138,8 @@ target.
    Windows/macOS requirements there are met.
 
 **Tests needed before any pane replacement**
-* The model and store suites (existing, currently 101 tests, self-run) and
-  the harness self-test.
+* The model and store suites (existing, currently 110 tests, self-run),
+  the harness self-test, and the callback host check (scenario H).
 * Pane-hosted GUI scenarios matching A to G in `scripts/screenshots.sh`:
   global, app explicit/inherited/Info.plist, Apply/Cancel/Reset, free-form
   commit, live receipt wording, unreadable target refused, AppImage
