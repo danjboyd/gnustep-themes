@@ -50,7 +50,7 @@ only; visual review of the screenshots has not been done independently.
 | Free-form field commit on Apply | 8b1be21 | scenario F | yes (#21198) |
 | AppImage sidecar reader | 8adc88e (aligned 5c50e75, pinned a410c52) | 19 sidecar tests | yes (#21531) |
 | Read-only AppImage targets in the editor | 62570a2 | 101/101 model tests; scenario G used a stand-in artifact and predates the final text | yes (#21659) |
-| Editor Apply callback contract in a real AppKit host (+ fix: typed text was read from live field-editor storage, so invalid text became a Reset that deleted the stored value) | see git log | scenario H, `Tests/HostCheck`: 14 checks on private Xvfb, negative control fails without the fix | pending |
+| Editor Apply callback contract in a real AppKit host (+ fix: typed text was read from live field-editor storage, so invalid text became a Reset that deleted the stored value) | 06a84a6 | scenario H, `Tests/HostCheck`: 14/14 host assertions on private Xvfb without a window manager; the reverted-fix control fails twice; fresh read-back; unit 110/110; harness 14/14 | yes (#22060) |
 
 ## Unresolved proof gaps
 
@@ -58,6 +58,7 @@ only; visual review of the screenshots has not been done independently.
 * Cross-process live propagation, and whether a host's `standardUserDefaults` sees in-app edits.
 * The same-key write race (optimistic detection only). The backend preflight is not atomic.
 * Return-to-Apply in free-form fields (only click-Apply is exercised).
+* Editor callbacks/field-editor behaviour under a real window manager (host check H ran without one); invalid-text refusal checked for the number type only.
 * `scripts/screenshots.sh` cannot see unmarked descendants (no session-based containment).
 * No real AppImage tested; whether an AppImage uses the same defaults store is unknown by design.
 * Windows/macOS: see docs/platforms.md (editing disabled or untested).
