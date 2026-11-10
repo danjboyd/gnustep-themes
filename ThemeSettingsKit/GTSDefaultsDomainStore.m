@@ -236,6 +236,7 @@ classifyPath(NSString *path, NSString **why)
         why = [NSString stringWithFormat: @"%@ is not readable", root];
         /* fall through */
       default:
+        if (why == nil) why = [NSString stringWithFormat: @"%@ is not a directory", root];
         if (error) *error = storeError(GTSErrorUnreadableDomain,
           @"defaults directory cannot be used: %@", why);
         return NO;
@@ -251,6 +252,7 @@ classifyPath(NSString *path, NSString **why)
         why = [NSString stringWithFormat: @"%@ is not readable", file];
         /* fall through */
       default:
+        if (why == nil) why = [NSString stringWithFormat: @"%@ is not a regular file", file];
         if (error) *error = storeError(GTSErrorUnreadableDomain,
           @"defaults for %@ exist but cannot be read: %@", domainName, why);
         return NO;

@@ -321,6 +321,18 @@ gumdropSetting(void)
   unlink([file fileSystemRepresentation]);
 }
 
+- (void) testDirectoryInPlaceOfDomainFileFailsClosed
+{
+  NSError *err = nil;
+  unlink([file fileSystemRepresentation]);
+  mkdir([file fileSystemRepresentation], 0700);
+  XCTAssertNil([store snapshotForDomain: app error: &err]);
+  XCTAssertEqual([err code], (NSInteger)GTSErrorUnreadableDomain);
+  XCTAssertTrue([[err localizedDescription] rangeOfString: @"not a regular file"].location != NSNotFound,
+    @"%@", [err localizedDescription]);
+  rmdir([file fileSystemRepresentation]);
+}
+
 - (void) testInaccessibleAncestorOfDefaultsRootFailsClosed
 {
   NSString *parent = [[GTSDefaultsDomainStore defaultsRoot] stringByDeletingLastPathComponent];
