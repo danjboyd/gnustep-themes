@@ -1,0 +1,54 @@
+/* Adwaita - semantics from owner reports #20389/#20402 at 09e7c6a.
+   KEY NAMES ARE PLACEHOLDERS until the adwaita owner sends the 9-key inventory. */
+{
+  SchemaVersion = 1;
+  Theme = Adwaita;
+  Provider = { Identifier = "org.gnustep.themes.adwaita"; Version = "09e7c6a"; };
+  Groups = ( { Identifier = appearance; Title = "Appearance"; },
+             { Identifier = layout; Title = "Layout"; } );
+  Settings = (
+    {
+      Identifier = "adwaita.color-scheme";
+      Key = AdwaitaColorScheme;            /* TBC */
+      Type = enum;
+      Values = (
+        { Value = default; Title = "Default (light)"; Help = "Stored explicitly; ignores GTK_THEME."; },
+        { Value = light; Title = "Light"; },
+        { Value = dark; Title = "Dark"; }
+      );
+      Scopes = ( global, application );
+      Group = appearance;
+      Title = "Color scheme";
+      Unset = { Behavior = dynamic; Help = "Follows GTK_THEME, then the GNOME color-scheme setting."; };
+      Apply = restart;                     /* TBC: live? */
+    },
+    {
+      Identifier = "adwaita.metrics";
+      Key = AdwaitaMetrics;                /* TBC */
+      Type = enum;
+      Values = (
+        { Value = auto; Title = "Automatic"; Help = "Stored explicitly; skips the app's Info.plist value."; },
+        { Value = compact; Title = "Compact"; },     /* TBC */
+        { Value = regular; Title = "Regular"; }      /* TBC */
+      );
+      Scopes = ( global, application );
+      Group = layout;
+      Title = "Metrics";
+      Unset = { Behavior = dynamic; Help = "Uses the app's Info.plist value if any, else automatic."; };
+      Precedence = ( argument, application, global, applicationInfo );
+      Apply = restart;
+    },
+    {
+      Identifier = "adwaita.header-bar-toolbar";
+      Key = AdwaitaHeaderBarToolbar;       /* TBC */
+      Type = bool;
+      Scopes = ( global, application );
+      Group = layout;
+      Title = "Merge toolbar into header bar";
+      Unset = { Behavior = static; Value = YES; };   /* TBC */
+      /* app/args win; an Info.plist NO beats a global YES. */
+      Precedence = ( argument, application, { Source = applicationInfo; Values = ( NO ); }, global, applicationInfo );
+      Apply = restart;
+    }
+  );
+}

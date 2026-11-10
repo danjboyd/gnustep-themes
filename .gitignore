@@ -1,0 +1,4 @@
+obj/
+*.bundle/
+*.app/
+derived_src/

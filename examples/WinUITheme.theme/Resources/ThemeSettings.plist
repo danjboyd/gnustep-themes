@@ -1,0 +1,44 @@
+/* WinUITheme - semantics from owner report #20399 at 0619d01.
+   KEY NAMES/VALUES ARE PLACEHOLDERS until the winuitheme owner confirms. */
+{
+  SchemaVersion = 1;
+  Theme = WinUITheme;
+  Provider = { Identifier = "org.gnustep.themes.winui"; Version = "0619d01"; };
+  Settings = (
+    {
+      Identifier = "winui.menu-style";
+      Key = WinUIMenuStyle;                /* TBC */
+      Type = enum;
+      Values = ( { Value = menubar; Title = "Menu bar"; }, { Value = window; Title = "In window"; } );  /* TBC */
+      Scopes = ( global, application );
+      Title = "Menu style";
+      Unset = { Behavior = static; Value = window; };  /* TBC */
+      Precedence = ( argument, application, { Source = applicationInfo; Values = ( menubar ); }, global, otherInfo );
+      Apply = restart;
+    },
+    {
+      Identifier = "winui.color-scheme";
+      Key = WinUIColorScheme;              /* TBC */
+      Type = enum;
+      Values = ( { Value = light; Title = "Light"; }, { Value = dark; Title = "Dark"; } );   /* TBC */
+      Scopes = ( global, application );
+      Title = "Color scheme";
+      /* No "follow OS" sentinel confirmed: removing an app override inherits global. */
+      Unset = { Behavior = dynamic; Help = "Follows the system preference when nothing is set globally."; };
+      Overlaps = ( "winui.prefer-dark", "winui.prefer-light" );
+      Apply = restart;
+    },
+    {
+      Identifier = "winui.prefer-dark"; Key = WinUIPreferDark; Type = bool;   /* TBC */
+      Scopes = ( global, application ); Title = "Prefer dark";
+      Unset = { Behavior = dynamic; Help = "Decided by color scheme / system."; };
+      Overlaps = ( "winui.color-scheme" ); Apply = restart; Status = unstable;
+    },
+    {
+      Identifier = "winui.prefer-light"; Key = WinUIPreferLight; Type = bool;  /* TBC */
+      Scopes = ( global, application ); Title = "Prefer light";
+      Unset = { Behavior = dynamic; Help = "Decided by color scheme / system."; };
+      Overlaps = ( "winui.color-scheme" ); Apply = restart; Status = unstable;
+    }
+  );
+}
