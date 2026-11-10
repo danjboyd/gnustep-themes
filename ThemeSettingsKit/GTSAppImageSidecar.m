@@ -162,7 +162,14 @@ isHex64(NSString *s)
       set = dict([td objectForKey: @"settings"]);
       status = str([set objectForKey: @"status"]);
       x->_settingsNote = [str([set objectForKey: @"note"]) copy];
-      if (set == nil) x->_settingsStatus = GTSSettingsNone;
+      if (set == nil && [td objectForKey: @"settings"] != nil
+        && [td objectForKey: @"settings"] != [NSNull null])
+        {
+          /* Present but not an object: damaged, not "no settings file". */
+          x->_settingsStatus = GTSSettingsMalformed;
+          [warnings addObject: [NSString stringWithFormat: @"theme %@: settings entry is malformed", x->_name]];
+        }
+      else if (set == nil) x->_settingsStatus = GTSSettingsNone;
       else if ([status isEqual: @"inline"]) x->_settingsStatus = GTSSettingsInline;
       else if ([status isEqual: @"notInlined"]) x->_settingsStatus = GTSSettingsNotInlined;
       else if ([status isEqual: @"malformed"]) x->_settingsStatus = GTSSettingsMalformed;

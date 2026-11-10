@@ -233,7 +233,8 @@ inlineGumdrop(void)
   XCTAssertEqual([[s themes] count], (NSUInteger)1);
   XCTAssertNil([[s themeNamed: @"T"] themeId], @"number is not an id");
   XCTAssertNil([[s themeNamed: @"T"] bundledPath]);
-  XCTAssertEqual([[s themeNamed: @"T"] settingsStatus], GTSSettingsNone);
+  XCTAssertEqual([[s themeNamed: @"T"] settingsStatus], GTSSettingsMalformed,
+    @"a wrong-typed settings entry is damaged, not absent");
   XCTAssertTrue([[s warnings] count] >= 1);
 
   [d setObject: @"not a list" forKey: @"themes"];
