@@ -164,7 +164,7 @@ target.
    Windows/macOS requirements there are met.
 
 **Tests needed before any pane replacement**
-* The model and store suites (existing, currently 113 tests, self-run),
+* The model and store suites (existing, currently 119 tests, self-run),
   the harness self-test, the callback host check (scenario H) and the
   installed-library smoke (scenario I).
 * Pane-hosted GUI scenarios matching A to G in `scripts/screenshots.sh`:
