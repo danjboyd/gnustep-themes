@@ -385,8 +385,9 @@ stateText(GTSResolvedValue *v, BOOL global)
     @"settings not available without opening the AppImage (too large)", @"settings description is damaged",
     @"settings not available (outside the AppImage or a link loop)", @"settings status not understood" };
 
+  /* "This view cannot change settings." is said once, by -themeStateText,
+     which is shown directly above this note. */
   [p addObject: [GTSAppImageSidecar descriptionOfBinding: _binding]];
-  [p addObject: @"This view cannot change settings."];
   if (_binding != GTSSidecarBound)
     {
       [p addObject: @"Nothing below is shown as current until the theme information matches the AppImage."];

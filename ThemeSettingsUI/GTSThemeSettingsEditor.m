@@ -16,6 +16,9 @@
    (both used to be 0). */
 enum { kThemePopupTag = 1, kRowTagBase = 1000 };
 
+/* kScrollerW: room for the vertical scroller, so the content view (and the
+   Reset column) is laid out inside the visible width, not under it. */
+static const float kScrollerW = 20;
 static const float kMargin = 16, kLabelW = 170, kControlW = 330, kResetW = 70, kGap = 8;
 
 static NSTextField *
@@ -57,7 +60,7 @@ wrappedHeight(NSString *text, float width, float size)
 
 - (id) initWithModel: (GTSEditorModel*)model
 {
-  NSRect frame = NSMakeRect(0, 0, kMargin * 2 + kLabelW + kControlW + kResetW + kGap * 2, 460);
+  NSRect frame = NSMakeRect(0, 0, kMargin * 2 + kLabelW + kControlW + kResetW + kGap * 2 + kScrollerW, 460);
   /* The editor only renders a GTSEditorModel. This class reference is also
      what records libThemeSettingsKit as a NEEDED dependency of the shared
      UI library (message sends alone would let --as-needed drop it). */
@@ -77,7 +80,7 @@ wrappedHeight(NSString *text, float width, float size)
   [_scroll setHasVerticalScroller: YES];
   [_scroll setBorderType: NSNoBorder];
   [_scroll setAutoresizingMask: NSViewWidthSizable | NSViewHeightSizable];
-  _content = [[GTSFlippedView alloc] initWithFrame: NSMakeRect(0, 0, frame.size.width - 20, 400)];
+  _content = [[GTSFlippedView alloc] initWithFrame: NSMakeRect(0, 0, frame.size.width - kScrollerW, 400)];
   [_scroll setDocumentView: _content];
   [_view addSubview: _scroll];
 
@@ -125,14 +128,32 @@ wrappedHeight(NSString *text, float width, float size)
 - (NSView*) view { return _view; }
 - (void) setDelegate: (id)delegate { _delegate = delegate; }
 
+static NSString *fittedTitle(NSString *title, NSFont *font, float room);
+
 - (NSPopUpButton*) popupWithChoices: (NSArray*)choices selected: (NSInteger)sel frame: (NSRect)f
 {
   NSPopUpButton *p = [[[NSPopUpButton alloc] initWithFrame: f pullsDown: NO] autorelease];
   NSEnumerator *e = [choices objectEnumerator];
   GTSChoice *c;
+  /* Room for the title inside the button, left of the arrow. */
+  float room = f.size.width - 36;
   while ((c = [e nextObject]) != nil)
-    [p addItemWithTitle: [c title]];
-  if (sel >= 0 && sel < [p numberOfItems]) [p selectItemAtIndex: sel];
+    {
+      /* A title too long for the button is shortened at a word with an
+         ellipsis; items stay in choice order, so selection by index is
+         unaffected. The full title is the button's tooltip. */
+      NSString *full = [c title], *shown = fittedTitle(full, [p font], room);
+      /* NSPopUpButton replaces an item with an equal title; never let
+         shortening merge two choices. */
+      if (![shown isEqual: full] && [p indexOfItemWithTitle: shown] >= 0)
+        shown = full;
+      [p addItemWithTitle: shown];
+    }
+  if (sel >= 0 && sel < [p numberOfItems] && sel < (NSInteger)[choices count])
+    {
+      [p selectItemAtIndex: sel];
+      [p setToolTip: [[choices objectAtIndex: sel] title]];
+    }
   return p;
 }
 
@@ -280,6 +301,24 @@ wrappedHeight(NSString *text, float width, float size)
     if ([v isKindOfClass: [NSTextField class]] && [(NSTextField*)v isEditable])
       [a addObject: v];
   return a;
+}
+
+/* title, or its longest word-boundary prefix plus an ellipsis that fits
+   in room points with font. */
+static NSString *
+fittedTitle(NSString *title, NSFont *font, float room)
+{
+  NSString *ell = [NSString stringWithFormat: @"%C", (unichar)0x2026];
+  NSString *s = title;
+  NSRange r;
+  if (font == nil || [font widthOfString: title] <= room) return title;
+  while ((r = [s rangeOfString: @" " options: NSBackwardsSearch]).location != NSNotFound && r.location > 0)
+    {
+      s = [s substringToIndex: r.location];
+      if ([font widthOfString: [s stringByAppendingString: ell]] <= room)
+        return [s stringByAppendingString: ell];
+    }
+  return title;
 }
 
 /* Text currently shown in a field, including uncommitted field-editor text. */

@@ -61,7 +61,8 @@ only; visual review of the screenshots has not been done independently.
 * A theme actually re-rendering after Apply: the example themes are metadata only.
 * Cross-process live propagation, and whether a host's `standardUserDefaults` sees in-app edits.
 * The same-key write race (optimistic detection only). The backend preflight is not atomic.
-* Return-to-Apply under a real window manager: host check H replays NSApp's key-down routing because the window cannot become key without one. With that routing, one Return applies the uncommitted text, and invalid text leaves Apply disabled, so nothing is written. Open UX point: after an invalid Return the field shows the stored value again and the typed text is lost; the model's message still says why.
+* Return-to-Apply under a real window manager: host check H replays NSApp's key-down routing because the window cannot become key without one. With that routing, one Return applies the uncommitted text. Invalid text leaves Apply disabled, so nothing is written; the typed text stays selected with the message (lead #24406), and Tab out of the field restores the stored value.
+* Shortened popup titles: the full title is the button's tooltip only. Tooltips and the open menu were not captured in screenshots.
 * Installed libraries: runtime resolution only via LD_LIBRARY_PATH (no rpath/.pc), no real-domain install, no ABI stability (soname 0, fragile public ivars under the GCC runtime). The app and demo deliberately keep compiled-in copies.
 * Editor callbacks/field-editor behaviour under a real window manager (host check H ran without one); invalid-text refusal checked for the number type only.
 * `scripts/screenshots.sh` cannot see unmarked descendants (no session-based containment).
