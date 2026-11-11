@@ -1,6 +1,9 @@
 /* GTSSHA256.m - thin wrapper over a maintained SHA-256 (GnuTLS). */
 #import "GTSSHA256.h"
 #include <stdio.h>
+#if defined(_WIN32)
+#include <wchar.h>
+#endif
 #ifdef GTS_HAVE_GNUTLS
 #include <gnutls/gnutls.h>
 #include <gnutls/crypto.h>
@@ -59,7 +62,13 @@ GTSSHA256HexOfFile(NSString *path)
   BOOL ok = YES;
 
   if (!GTSSHA256IsAvailable()) return nil;
+#if defined(_WIN32)
+  /* On Windows -fileSystemRepresentation is a wide (UTF-16) string; fopen
+     would see only its first character (winuitheme #24772). */
+  if ((f = _wfopen((const wchar_t*)[path fileSystemRepresentation], L"rb")) == NULL) return nil;
+#else
   if ((f = fopen([path fileSystemRepresentation], "rb")) == NULL) return nil;
+#endif
   if (gnutls_hash_init(&h, GNUTLS_DIG_SHA256) < 0) { fclose(f); return nil; }
   while ((n = fread(buf, 1, sizeof buf, f)) > 0)      /* streamed, never whole-file */
     if (gnutls_hash(h, buf, n) < 0) { ok = NO; break; }

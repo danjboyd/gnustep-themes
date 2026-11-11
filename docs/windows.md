@@ -1,9 +1,9 @@
 # Windows: portability audit and build recipe (MSYS2 CLANG64)
 
-Status: 2026-11-10, static audit only. **Nothing here has been built or run
-on Windows.** Every Windows statement below is UNTESTED until someone (the
-plan is winuitheme) runs the recipe in section 3. Line numbers are valid at
-the commit that adds this document. See also docs/platforms.md.
+Status: audited 2026-11-10; **first Windows build 2026-11-11** by winuitheme
+at b9939d5 (see section 4). Statements still marked UNTESTED were not covered
+by that run. Line numbers are valid at the commit that adds this document
+unless noted. See also docs/platforms.md.
 
 ## 1. Audit (Kit, UI library, standalone app, validator)
 
@@ -21,6 +21,7 @@ the commit that adds this document. See also docs/platforms.md.
 | 10 | `ThemeSettingsKit/GTSThemeSettingsSchema.h:5-14`, `GTSThemeCatalog.h:10-18` | Exported data constants (`extern NSString * const GTS...`) used across a DLL boundary. | Left as is. MinGW ld/lld auto-import handles data imports, as gnustep-make's library.make notes ("usually not needed"). If the linker complains, mark them `__declspec(dllimport)` unless `BUILD_libThemeSettingsKit_DLL` is defined (gnustep-make defines that when building the DLL). **UNTESTED.** |
 | 11 | `ThemeSettingsUI/GTSScreenshot.m:10` | Window capture via `NSBitmapImageRep initWithFocusedViewRect:`. | A review/test helper only, and not in the UI library. Backend-dependent (winlib); **UNTESTED**. |
 | 12 | `Tests/GTSTestSupport.m:27-38` (`realpath`), `Tests/ExternalHost/main.m:6,24` (`dladdr`), `scripts/*.sh` (Xvfb, `/proc`, `setsid`, `ldd`, `LD_LIBRARY_PATH`) | Test harness and GUI scenarios. | Linux-only by design. The isolation recipe (`GNUSTEP_CONFIG_FILE`) is file-backend specific. A Windows harness would need its own isolation (see #2). Not ported. |
+| 14 | `ThemeSettingsKit/GTSSHA256.m` (file open) | `fopen([path fileSystemRepresentation], ...)`: on Windows that representation is UTF-16, so `fopen` saw only the first character and every hash silently returned nil (found by the Windows build's only compiler warning). | **Fixed:** `_wfopen` on `_WIN32`. Hashing on Windows itself is **UNTESTED** (only AppImage sidecars use it). |
 | 13 | `Tools/ValidateSchema/main.m` | Command-line validator. | Portable Foundation code (text plist parsing, no defaults access, no theme code). **The first thing to try on Windows.** |
 
 No `dlopen`, no hard-coded `/usr` or `/home` paths, and no `.so` names
@@ -85,3 +86,38 @@ directory, which must be on `PATH` (the Windows equivalent of
 
 Item 5 is the input for enabling editing on Windows (platforms.md, Windows
 steps 1-3). Editing stays disabled until then.
+
+## 4. First Windows run (winuitheme, 2026-11-11, report #24772)
+
+Windows 11 Home 26300, MSYS2 CLANG64, clang 21.1.8, gnustep-make 2.9.3,
+base 1.31.1, gui 0.32.0, GnuTLS 3.8.12. Fresh clone at
+b9939d568be30d49e7641e96dd4d1a2d4c4eed49; no `make install`.
+
+* **Build:** the validator, both libraries (`ThemeSettingsKit-0.dll` and
+  `ThemeSettingsUI-0.dll`, each with its `lib*.dll.a`) and ThemeSettings.app
+  built with exit 0. The linker gave no undefined-symbol or data-import
+  messages: the exported string constants (#10) link through auto-import.
+  The only compiler warning was #14, now fixed.
+* **Validator:** the three example themes give 0 errors and 0 warnings
+  (exit 0). The real WinUITheme bundle reports "no ThemeSettings.plist in
+  the bundle" (exit 1), which is expected: it doesn't ship one yet.
+* **Defaults backend: files, not the registry.** A throwaway domain written
+  with `defaults` appeared as `%USERPROFILE%\GNUstep\Defaults\<domain>.plist`
+  (lock file `.lck`), and nothing appeared under `HKCU\Software\GNUstep`.
+  This matches `GNUSTEP_USER_DEFAULTS_DIR=GNUstep/Defaults` in the MSYS2
+  GNUstep.conf. It is the same file-per-domain layout as on Linux, and it
+  is the input platforms.md needs for enabling editing.
+* **Noise:** under an MSYS2 login whose POSIX user name differs from the
+  Windows account, each run printed `NSHomeDirectoryForUser(agent) failed.`
+  five times. Something resolves the home directory by user name. The
+  store's `GSDefaultsRootForUser(NSUserName())` (#2) is a candidate, and
+  it matters before editing is enabled.
+* **Still pending:** the app screenshot (item 4), so whether the app runs
+  and the constants resolve at run time is not yet shown.
+
+**Editing stays disabled on Windows** (`isBackendSupported` NO). To enable
+it:
+1. replace the POSIX-only `classifyPath`/`canRead` stubs (#1) with
+   Windows-aware checks;
+2. resolve the defaults root without the user-name lookup above;
+3. rerun the store tests on a Windows host.
