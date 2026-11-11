@@ -1,91 +1,59 @@
-/* Gumdrop (fun-themes) - MIRROR of the owner's Themes/Gumdrop/ThemeSettings.plist
-   (owner #25761: confirmed, local in fun-themes, not yet committed there);
-   same settings and help text, with file:line comments added here.
-   Menu style: owner msgs #20599/#20861 at b3a960d, Source/GumdropMenus.m:65-76,
-   GumdropWindow.m:201,522-576; labels per owner review #20946. An Info.plist
-   value other than "menubar" ends as primary, so only "menubar" is listed as
-   winning from Info.plist.
-   Font, corner radius and shadows are GNUstep CORE keys that Gumdrop reads
-   (owner #25682); Gumdrop defines no keys of its own for them, and none for
-   scroller width or accent colour (both are constants in the theme).
-   "Unset" values are Gumdrop's GSThemeDomain values from GumdropInfo.plist
-   (owner #25682: lines 48, 50, 54, 71). libs-gui ranks GSThemeDomain below
-   the application and global domains (GSTheme.m:590-604), so a user value
-   always wins and the theme value applies only when no domain sets the key.
-   ThemeIdentifier is a proposed descriptor identity; Gumdrop's Info.plist
-   does not declare it. */
+/* Core font and window settings use Gumdrop's GSThemeDomain fallbacks.
+   GNUstep ranks application and global defaults above that domain. */
 {
   SchemaVersion = 1;
   Theme = Gumdrop;
   ThemeIdentifier = "org.gnustep.themes.gumdrop";
   Groups = (
+    { Identifier = layout; Title = "Layout"; },
     { Identifier = menus; Title = "Menus"; },
     { Identifier = text; Title = "Text"; },
     { Identifier = windows; Title = "Windows"; }
   );
   Settings = (
     {
-      Identifier = "gumdrop.menu-style";
-      Key = GumdropMenuStyle;
-      Type = enum;
-      CaseInsensitive = YES;
-      Values = (
-        { Value = primary; Title = "Title-bar menu button"; },
-        { Value = menubar; Title = "In-window menu bar"; }
-      );
-      Scopes = ( global, application );
-      Group = menus;
-      Title = "Menu style";
-      /* Unset: falls back to the main app's Info.plist, then primary.
-         Removing an override is NOT the same as storing primary. */
+      Identifier = "gumdrop.size"; Key = GumdropSize; Type = enum; CaseInsensitive = YES;
+      Values = ( { Value = Regular; Title = "Regular"; }, { Value = Compact; Title = "Compact"; } );
+      Scopes = ( global, application ); Group = layout; Title = "Control size";
+      Help = "Compact uses 87.5% control sizes and default font sizes. An explicit Default system font size wins. Apps with fixed layouts may keep their existing spacing.";
+      Overlaps = ( "gumdrop.font-size" );
+      Unset = { Behavior = dynamic; Help = "the app's own preference, else Regular on Linux and Compact on Windows"; };
+      Precedence = ( argument, application, global, { Source = applicationInfo; Values = ( Regular, Compact ); } );
+      Apply = restart;
+    },
+    {
+      Identifier = "gumdrop.menu-style"; Key = GumdropMenuStyle; Type = enum; CaseInsensitive = YES;
+      Values = ( { Value = primary; Title = "Title-bar menu button"; }, { Value = menubar; Title = "In-window menu bar"; } );
+      Scopes = ( global, application ); Group = menus; Title = "Menu style";
       Unset = { Behavior = static; Value = primary; };
       Precedence = ( argument, application, global, { Source = applicationInfo; Values = ( menubar ); } );
       Apply = restart;
     },
-    { /* core: NSFont.m:329-360, 678; Gumdrop default GumdropInfo.plist:54 */
-      Identifier = "gumdrop.font";
-      Key = NSFont;
-      Type = string;
-      Scopes = ( global, application );
-      Group = text;
-      Title = "Interface font";
-      Help = "Font name as GNUstep knows it (for example DejaVuSans). This changes the default system font. Bold text and controls using role-specific fonts (labels, menus, messages and tooltips) retain their separate theme defaults.";
+    {
+      Identifier = "gumdrop.font"; Key = NSFont; Type = string;
+      Scopes = ( global, application ); Group = text; Title = "Default system font";
+      Help = "Font name as GNUstep knows it (for example DejaVuSans). Most standard controls use this base font. Menus, text views, bold text and some labels use separate role fonts.";
       Unset = { Behavior = static; Value = DejaVuSans; };
       Apply = restart;
     },
-    { /* core: NSFont.m:329-360, 678; Gumdrop default GumdropInfo.plist:71 */
-      Identifier = "gumdrop.font-size";
-      Key = NSFontSize;
-      Type = number;
-      Minimum = 0;
-      Scopes = ( global, application );
-      Group = text;
-      Title = "Interface font size";
-      Help = "Default system font size in points. 0 uses GNUstep's built-in default size. Role-specific font sizes retain their separate theme defaults.";
-      Unset = { Behavior = static; Value = 14.6667; };
+    {
+      Identifier = "gumdrop.font-size"; Key = NSFontSize; Type = number; Minimum = 0;
+      Overlaps = ( "gumdrop.size" );
+      Scopes = ( global, application ); Group = text; Title = "Default system font size";
+      Help = "Default system font size in points. 0 uses GNUstep's built-in default size. Explicit role font sizes remain independent of this setting.";
+      Unset = { Behavior = dynamic; Help = "14.6667 points in Regular, 12.8334 points in Compact"; };
       Apply = restart;
     },
-    { /* core/backend; read by Gumdrop at GumdropWindow.m:626 (clamped to
-         0..half the frame); default GumdropInfo.plist:50 */
-      Identifier = "gumdrop.window-corner-radius";
-      Key = GSBackWindowCornerRadius;
-      Type = number;
-      Minimum = 0;
-      Scopes = ( global, application );
-      Group = windows;
-      Title = "Window corner radius";
+    {
+      Identifier = "gumdrop.window-corner-radius"; Key = GSBackWindowCornerRadius; Type = number; Minimum = 0;
+      Scopes = ( global, application ); Group = windows; Title = "Window corner radius";
       Help = "Rounding of window corners, in points. Only where the display backend draws the window frame; larger values are limited to half the window size.";
       Unset = { Behavior = static; Value = 8; };
       Apply = newWindows;
     },
-    { /* core/backend; read by Gumdrop at GumdropWindow.m:625 and by capable
-         backends; default GumdropInfo.plist:48 */
-      Identifier = "gumdrop.window-shadows";
-      Key = GSBackWindowShadows;
-      Type = bool;
-      Scopes = ( global, application );
-      Group = windows;
-      Title = "Window shadows";
+    {
+      Identifier = "gumdrop.window-shadows"; Key = GSBackWindowShadows; Type = bool;
+      Scopes = ( global, application ); Group = windows; Title = "Window shadows";
       Help = "Shadows around windows. Only where the display backend supports them.";
       Unset = { Behavior = static; Value = YES; };
       Apply = newWindows;

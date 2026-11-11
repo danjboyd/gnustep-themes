@@ -38,7 +38,7 @@ restarts".
 
 ![Same app right after Apply](screenshots/e2e/J3-pane-applied.png)
 
-## Gumdrop (scenarios K and L), gnustep-funthemes 5e76007, 2026-11-11
+## Gumdrop (scenarios K and L at 5e76007; owner proofs later), 2026-11-11
 
 The editor changed all five settings, and the read-back confirms all five
 were saved: menu style menubar, interface font DejaVuSerif, font size 20,
@@ -93,3 +93,26 @@ c0001fb:
 That repository is private, so these links work only for its members. This applies to X11 with csd8, where GNUstep draws the
 window frame. On a backend that leaves frames to the window manager,
 corners and shadows have no effect, as the help text says.
+
+**Control size (density, added at 5fd5fa6): visible on Linux (fun-themes,
+2026-11-11).** The same editor-to-screen method was used. ThemeSettings
+3a749f9 loaded Gumdrop's settings file at 5fd5fa6 and chose Regular, then
+Compact, for a scratch GumdropDemo application domain. Apply saved each
+choice and `defaults read` matched. A new app process then started with no
+size or font arguments, and full-screen captures were taken.
+
+| | Regular | Compact |
+|---|---|---|
+| Scale | 1 | 0.875 |
+| Default system font size | 14.6667 | 12.8334 |
+| Title bar height | 40 | 35 |
+| Scroller width | 19 | 17 |
+
+The captures differ visibly. Controls with app-authored fixed frames kept
+their exact sizes, and the window shrank from 760 to 747 points high. Scope:
+Linux, GNOME/X11 with csd8, 96 DPI, application domain only. No global-domain
+or Windows proof is claimed. The proof is in fun-themes' local commit cdb9c9d
+(not yet pushed); its settings file is public at
+[5fd5fa6](https://github.com/danjboyd/gnustep-funthemes/blob/5fd5fa64802a0325d713a4ec3201b437a4b4a5cd/Themes/Gumdrop/ThemeSettings.plist),
+which `examples/Gumdrop.theme` now mirrors byte for byte.
+
