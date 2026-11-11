@@ -95,8 +95,15 @@
   XCTAssertTrue([[model themeNote] rangeOfString: @"not confirmed as the AppImage's current settings"].location != NSNotFound);
   XCTAssertTrue([[model themeNote] rangeOfString: @"matches this AppImage"].location != NSNotFound);
   XCTAssertTrue([[model themeNote] rangeOfString: @"is not known"].location != NSNotFound, @"compatibility unknown");
-  XCTAssertEqual([[model rows] count], (NSUInteger)1);
-  XCTAssertEqualObjects([[[model rows] lastObject] stateText], @"In this editor's store: set for this application");
+  /* Gumdrop's example describes 5 settings; only menu style is set here. */
+  XCTAssertEqual([[model rows] count], (NSUInteger)5);
+  {
+    NSEnumerator *e = [[model rows] objectEnumerator];
+    GTSSettingRow *row, *menu = nil;
+    while ((row = [e nextObject]) != nil)
+      if ([[[row setting] identifier] isEqual: @"gumdrop.menu-style"]) menu = row;
+    XCTAssertEqualObjects([menu stateText], @"In this editor's store: set for this application");
+  }
   [self assertNothingEditable];
   XCTAssertEqualObjects(GTSExternalRead(domain, @"GumdropMenuStyle"), @"menubar", @"nothing written");
 

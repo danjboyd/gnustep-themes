@@ -56,7 +56,12 @@
 
 - (GTSSettingRow*) menuRow: (GTSEditorModel*)m
 {
-  return [[m rows] lastObject];   /* Gumdrop has exactly one setting */
+  NSEnumerator *e = [[m rows] objectEnumerator];
+  GTSSettingRow *row;
+  while ((row = [e nextObject]) != nil)
+    if ([[[row setting] identifier] isEqual: @"gumdrop.menu-style"]) return row;
+  XCTFail(@"no gumdrop.menu-style row");
+  return nil;
 }
 
 - (void) choosePrimary: (GTSEditorModel*)m

@@ -1,14 +1,27 @@
-/* Gumdrop (fun-themes) - DRAFT for the fun-themes owner's review.
-   Semantics from owner msgs #20599/#20861 at b3a960d, Source/GumdropMenus.m:65-76,
-   GumdropWindow.m:201,522-576. An Info.plist value other than "menubar" ends as
-   primary, so only "menubar" is listed as winning from Info.plist.
+/* Gumdrop (fun-themes) - DRAFT for the fun-themes owner to validate and
+   commit as Themes/Gumdrop/ThemeSettings.plist (owner request #25682).
+   Menu style: owner msgs #20599/#20861 at b3a960d, Source/GumdropMenus.m:65-76,
+   GumdropWindow.m:201,522-576; labels per owner review #20946. An Info.plist
+   value other than "menubar" ends as primary, so only "menubar" is listed as
+   winning from Info.plist.
+   Font, corner radius and shadows are GNUstep CORE keys that Gumdrop reads
+   (owner #25682); Gumdrop defines no keys of its own for them, and none for
+   scroller width or accent colour (both are constants in the theme).
+   "Unset" values are Gumdrop's GSThemeDomain values from GumdropInfo.plist
+   (owner #25682: lines 48, 50, 54, 71). libs-gui ranks GSThemeDomain below
+   the application and global domains (GSTheme.m:590-604), so a user value
+   always wins and the theme value applies only when no domain sets the key.
    ThemeIdentifier is a proposed descriptor identity; Gumdrop's Info.plist
-   does not declare it. Labels per owner review #20946. */
+   does not declare it. */
 {
   SchemaVersion = 1;
   Theme = Gumdrop;
   ThemeIdentifier = "org.gnustep.themes.gumdrop";
-  Groups = ( { Identifier = menus; Title = "Menus"; } );
+  Groups = (
+    { Identifier = menus; Title = "Menus"; },
+    { Identifier = text; Title = "Text"; },
+    { Identifier = windows; Title = "Windows"; }
+  );
   Settings = (
     {
       Identifier = "gumdrop.menu-style";
@@ -27,6 +40,54 @@
       Unset = { Behavior = static; Value = primary; };
       Precedence = ( argument, application, global, { Source = applicationInfo; Values = ( menubar ); } );
       Apply = restart;
+    },
+    { /* core: NSFont.m:329-360, 678; Gumdrop default GumdropInfo.plist:54 */
+      Identifier = "gumdrop.font";
+      Key = NSFont;
+      Type = string;
+      Scopes = ( global, application );
+      Group = text;
+      Title = "Interface font";
+      Help = "Font name for the interface, as GNUstep knows it (for example DejaVuSans). Bold text uses NSBoldFont, which this setting does not change.";
+      Unset = { Behavior = static; Value = DejaVuSans; };
+      Apply = restart;
+    },
+    { /* core: NSFont.m:329-360, 678; Gumdrop default GumdropInfo.plist:71 */
+      Identifier = "gumdrop.font-size";
+      Key = NSFontSize;
+      Type = number;
+      Minimum = 0;
+      Scopes = ( global, application );
+      Group = text;
+      Title = "Interface font size";
+      Help = "Size in points. 0 uses GNUstep's built-in default size.";
+      Unset = { Behavior = static; Value = 14.6667; };
+      Apply = restart;
+    },
+    { /* core/backend; read by Gumdrop at GumdropWindow.m:626 (clamped to
+         0..half the frame); default GumdropInfo.plist:50 */
+      Identifier = "gumdrop.window-corner-radius";
+      Key = GSBackWindowCornerRadius;
+      Type = number;
+      Minimum = 0;
+      Scopes = ( global, application );
+      Group = windows;
+      Title = "Window corner radius";
+      Help = "Rounding of window corners, in points. Only where the display backend draws the window frame; larger values are limited to half the window size.";
+      Unset = { Behavior = static; Value = 8; };
+      Apply = newWindows;
+    },
+    { /* core/backend; read by Gumdrop at GumdropWindow.m:625 and by capable
+         backends; default GumdropInfo.plist:48 */
+      Identifier = "gumdrop.window-shadows";
+      Key = GSBackWindowShadows;
+      Type = bool;
+      Scopes = ( global, application );
+      Group = windows;
+      Title = "Window shadows";
+      Help = "Shadows around windows. Only where the display backend supports them.";
+      Unset = { Behavior = static; Value = YES; };
+      Apply = newWindows;
     }
   );
 }
