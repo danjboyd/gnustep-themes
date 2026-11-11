@@ -28,15 +28,18 @@ No `dlopen`, no hard-coded `/usr` or `/home` paths, and no `.so` names
 exist in the Kit, the UI library, the app or the validator. `.so` and
 `LD_LIBRARY_PATH` appear only in the Linux test scripts and docs.
 
-## 2. What works on Windows after these fixes (expected, UNTESTED)
+## 2. What works on Windows (verified 2026-11-11 at c39c935, section 4)
 
-* **Builds:** the Kit and UI libraries, the standalone app, DemoNotes and
-  the validator.
+* **Builds:** the Kit and UI libraries, the standalone app and the
+  validator, with no warnings.
 * **Validator:** fully functional.
-* **Editor:** opens and lists themes and settings. Every target is
-  **read-only** with "this defaults backend is not supported for editing
-  yet", because `isBackendSupported` is NO (#2). This is intended until the
-  backend is verified.
+* **Editor:** starts and runs, but shows **nothing** for any target. The
+  store refuses to read as well as write, because `isBackendSupported` is
+  NO (#2) and that one check guards both. Every target shows "Unknown
+  (settings could not be read)", the message "this defaults backend is not
+  supported for editing yet", and Apply and Cancel greyed out. Nothing is
+  written. (This document originally predicted read-only lists; that was
+  wrong.)
 
 ## 3. Build recipe for winuitheme (MSYS2 CLANG64)
 
@@ -63,8 +66,9 @@ ls ThemeSettingsKit/obj ThemeSettingsUI/obj   # expect *.dll and lib*.dll.a
 # 3. The standalone app, pointed at the example themes
 make -C ThemeSettingsApp
 openapp ./ThemeSettingsApp/ThemeSettings.app -GTSExtraThemeRoot "$PWD/examples"
-#    expect: theme list and settings visible; targets read-only with
-#    "this defaults backend is not supported for editing yet"
+#    expect today: the app runs; every target reads "Unknown (settings could
+#    not be read)" with "this defaults backend is not supported for editing
+#    yet" (section 2)
 ```
 
 Do **not** run `make install` into a real GNUstep domain. To try the staged
@@ -112,11 +116,19 @@ b9939d568be30d49e7641e96dd4d1a2d4c4eed49; no `make install`.
   five times. Something resolves the home directory by user name. The
   store's `GSDefaultsRootForUser(NSUserName())` (#2) is a candidate, and
   it matters before editing is enabled.
-* **Still pending:** the app screenshot (item 4), so whether the app runs
-  and the constants resolve at run time is not yet shown.
+* **App run (at c39c935, rebuilt with no warnings).** ThemeSettings.exe
+  started in a private GNUstep home with the example themes and exited 0.
+  The scripted theme change failed with "this defaults backend is not
+  supported for editing yet". The screenshot shows the global target as
+  "Unknown (settings could not be read)", Reload enabled, Apply and Cancel
+  greyed, and nothing written. So the exported constants resolve at run
+  time, and the refusal gate holds. The screenshot itself stays on the
+  Windows host; it was not copied here.
 
-**Editing stays disabled on Windows** (`isBackendSupported` NO). To enable
-it:
+**Reading and editing both stay disabled on Windows** (`isBackendSupported`
+NO). The defaults are plain files, so reading could come first, as a
+separate read gate with writes still refused. To enable reading, then
+editing:
 1. replace the POSIX-only `classifyPath`/`canRead` stubs (#1) with
    Windows-aware checks;
 2. resolve the defaults root without the user-name lookup above;
