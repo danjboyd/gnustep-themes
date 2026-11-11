@@ -1,5 +1,6 @@
-/* Gumdrop (fun-themes) - DRAFT for the fun-themes owner to validate and
-   commit as Themes/Gumdrop/ThemeSettings.plist (owner request #25682).
+/* Gumdrop (fun-themes) - MIRROR of the owner's Themes/Gumdrop/ThemeSettings.plist
+   (owner #25761: confirmed, local in fun-themes, not yet committed there);
+   same settings and help text, with file:line comments added here.
    Menu style: owner msgs #20599/#20861 at b3a960d, Source/GumdropMenus.m:65-76,
    GumdropWindow.m:201,522-576; labels per owner review #20946. An Info.plist
    value other than "menubar" ends as primary, so only "menubar" is listed as
@@ -48,7 +49,7 @@
       Scopes = ( global, application );
       Group = text;
       Title = "Interface font";
-      Help = "Font name for the interface, as GNUstep knows it (for example DejaVuSans). Bold text uses NSBoldFont, which this setting does not change.";
+      Help = "Font name as GNUstep knows it (for example DejaVuSans). This changes the default system font. Bold text and controls using role-specific fonts (labels, menus, messages and tooltips) retain their separate theme defaults.";
       Unset = { Behavior = static; Value = DejaVuSans; };
       Apply = restart;
     },
@@ -60,7 +61,7 @@
       Scopes = ( global, application );
       Group = text;
       Title = "Interface font size";
-      Help = "Size in points. 0 uses GNUstep's built-in default size.";
+      Help = "Default system font size in points. 0 uses GNUstep's built-in default size. Role-specific font sizes retain their separate theme defaults.";
       Unset = { Behavior = static; Value = 14.6667; };
       Apply = restart;
     },
