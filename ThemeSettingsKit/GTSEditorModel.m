@@ -198,7 +198,21 @@
     }
   return [[self effectiveTheme] schema];
 }
-- (BOOL) isEditable { return _session != nil && ![_session needsRebase]; }
+/* NO when the defaults backend can be read but not written here (Windows
+   today): values are shown read-only and nothing can be staged. */
+- (BOOL) storeIsWritable
+{
+  Class c = [_store class];
+  return [c respondsToSelector: @selector(isBackendWritable)] ? [c isBackendWritable] : YES;
+}
+
+- (NSString*) diagnostics
+{
+  Class c = [_store class];
+  return [c respondsToSelector: @selector(defaultsRootDescription)] ? [c defaultsRootDescription] : nil;
+}
+
+- (BOOL) isEditable { return _session != nil && ![_session needsRebase] && [self storeIsWritable]; }
 
 - (BOOL) targetIsGlobal { return _appDomain == nil; }
 - (GTSEditSession*) session { return _session; }
@@ -348,6 +362,8 @@ stateText(GTSResolvedValue *v, BOOL global)
   if (_session == nil)
     return @"This target's settings could not be read, so nothing here can be shown or changed. "
       @"Nothing has been written. See the message below.";
+  if (![self storeIsWritable])
+    [parts addObject: @"Shown read-only: settings can be read on this system but not changed here yet."];
   if (![r isAvailable])
     return [NSString stringWithFormat: @"%@ is selected but not installed for this target; "
       @"GNUstep falls back to its default theme.", [r name]];
@@ -420,6 +436,11 @@ stateText(GTSResolvedValue *v, BOOL global)
 - (void) selectThemeChoiceAtIndex: (NSInteger)index
 {
   if (_sidecar != nil) return;   /* read-only */
+  if (![self storeIsWritable])
+    {
+      [self setMessage: @"this defaults backend is not supported for editing yet"];
+      return;
+    }
   [self clearOutcome];             /* a new edit makes the last outcome stale */
   NSArray *c = [self themeChoices];
   if (index < 0 || (NSUInteger)index >= [c count]) return;
@@ -484,7 +505,7 @@ stateText(GTSResolvedValue *v, BOOL global)
       row->_stateText = [(_sidecar != nil
         ? [NSString stringWithFormat: @"In this editor's store: %@", [stateText(v, NO) lowercaseString]]
         : stateText(v, [self targetIsGlobal])) copy];
-      row->_readOnly = [s isReadOnly] || [sc isReadOnly] || _sidecar != nil;
+      row->_readOnly = [s isReadOnly] || [sc isReadOnly] || _sidecar != nil || ![self storeIsWritable];
       if (_sidecar != nil)
         [notes addObject: @"This view cannot change settings."];
       row->_canReset = [v hasOverride] && !row->_readOnly;

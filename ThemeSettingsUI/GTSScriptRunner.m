@@ -45,6 +45,7 @@
   else if ([step isEqual: @"log"])
     {
       fprintf(stderr, "script: message: %s\n", [[[_editor model] message] ? [[_editor model] message] : @"" UTF8String]);
+      fprintf(stderr, "script: diagnostics: %s\n", [[[_editor model] diagnostics] ? [[_editor model] diagnostics] : @"" UTF8String]);
       ok = YES;
     }
   else

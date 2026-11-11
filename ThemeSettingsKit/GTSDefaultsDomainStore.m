@@ -167,13 +167,58 @@ isPropertyList(id v, int depth)
     && ![name hasPrefix: @"."];
 }
 
-+ (BOOL) isBackendSupported
+/* Test switch: -1 = real platform answer; 0/1 force writable NO/YES. */
+static int gWritableOverride = -1;
+
++ (void) setBackendWritableOverrideForTesting: (int)value
 {
-#if defined(_WIN32) || defined(__MINGW32__) || defined(__CYGWIN__)
-  return NO;   /* base may use the registry here; not verified */
+  gWritableOverride = value;
+}
+
++ (BOOL) isBackendReadable
+{
+#if defined(_WIN32)
+  /* GNUstep's file backend keeps one plist per domain, as on POSIX
+     (winuitheme, docs/windows.md section 4). A GNUSTEP_USER_DEFAULTS_DIR
+     of ":REGISTRY:" selects the registry instead, which this store
+     cannot read. PENDING winuitheme rerun. */
+  return [[self defaultsRoot] rangeOfString: @":REGISTRY:"].length == 0;
+#elif defined(__CYGWIN__)
+  return NO;
 #else
   return YES;
 #endif
+}
+
++ (BOOL) isBackendWritable
+{
+  if (gWritableOverride >= 0) return gWritableOverride ? YES : NO;
+#if defined(_WIN32) || defined(__MINGW32__) || defined(__CYGWIN__)
+  return NO;   /* writes not verified on Windows; no Windows write path yet */
+#else
+  return YES;
+#endif
+}
+
++ (BOOL) isBackendSupported
+{
+  return [self isBackendWritable];
+}
+
++ (NSString*) defaultsRootDescription
+{
+  NSString *root = [self defaultsRoot];
+  return [NSString stringWithFormat:
+    @"Defaults root: %@ (the same lookup as this process's NSUserDefaults: "
+    @"GSDefaultsRootForUser(NSUserName()); the current user's home comes from "
+#if defined(_WIN32)
+    @"GNUSTEP_HOME, HOMEPATH or USERPROFILE"
+#else
+    @"GNUSTEP_HOME or the password database"
+#endif
+    @", not a lookup of another user)%@%@.", root ? root : @"(none)",
+    [self isBackendReadable] ? @"; readable" : @"; NOT readable",
+    [self isBackendWritable] ? @", writable" : @", NOT writable (read-only)"];
 }
 
 /* lstat-based classification. Only ENOENT counts as "absent"; any other
@@ -181,19 +226,38 @@ isPropertyList(id v, int depth)
 typedef enum { GTSPathAbsent, GTSPathFile, GTSPathDirectory, GTSPathError } GTSPathKind;
 
 #if defined(_WIN32)
-/* Never reached: isBackendSupported is NO here, and checkBackendForDomain
-   returns before classifying anything. Kept so the Kit compiles with MinGW
-   (no lstat/S_ISLNK, and _access rejects X_OK). Fails closed if ever used. */
+/* NSFileManager-based classification (no lstat/S_ISLNK on MinGW, and
+   UCRT _access rejects X_OK). Same policy as POSIX: only "does not exist"
+   counts as absent; a link whose target is missing, or an unexpected file
+   type, is an error. PENDING winuitheme rerun. */
 static GTSPathKind
 classifyPath(NSString *path, NSString **why)
 {
-  if (why) *why = [NSString stringWithFormat: @"%@: not checked on this platform", path];
+  NSFileManager *fm = [NSFileManager defaultManager];
+  NSDictionary *own = [fm fileAttributesAtPath: path traverseLink: NO];
+  NSDictionary *target;
+  NSString *type;
+  if (own == nil)
+    return GTSPathAbsent;
+  target = [fm fileAttributesAtPath: path traverseLink: YES];
+  if (target == nil)
+    {
+      if (why) *why = [NSString stringWithFormat: @"%@: %@", path,
+        [[own fileType] isEqual: NSFileTypeSymbolicLink] ? @"dangling link" : @"cannot be examined"];
+      return GTSPathError;
+    }
+  type = [target fileType];
+  if ([type isEqual: NSFileTypeDirectory]) return GTSPathDirectory;
+  if ([type isEqual: NSFileTypeRegular]) return GTSPathFile;
+  if (why) *why = [NSString stringWithFormat: @"%@ is not a regular file or directory", path];
   return GTSPathError;
 }
 static BOOL
 canRead(NSString *path, BOOL isDirectory)
 {
-  return NO;
+  NSFileManager *fm = [NSFileManager defaultManager];
+  if (!isDirectory) return [fm isReadableFileAtPath: path];
+  return [fm isReadableFileAtPath: path] && [fm isExecutableFileAtPath: path];
 }
 #else
 static BOOL
@@ -244,7 +308,7 @@ classifyPath(NSString *path, NSString **why)
   id parsed;
 
   *fileValues = nil;
-  if (![[self class] isBackendSupported])
+  if (![[self class] isBackendReadable])
     {
       if (error) *error = storeError(GTSErrorUnsupportedBackend,
         @"this defaults backend is not supported for editing yet");
@@ -442,6 +506,12 @@ classifyPath(NSString *path, NSString **why)
       return NO;
     }
   if ([changes count] == 0) return YES;
+  if (![[self class] isBackendWritable])
+    {
+      if (error) *error = storeError(GTSErrorUnsupportedBackend,
+        @"this defaults backend is not supported for editing yet");
+      return NO;
+    }
 
   current = [self loadDomain: domainName defaults: &d error: error];
   if (current == nil)

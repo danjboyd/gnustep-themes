@@ -60,6 +60,7 @@
 
   _model = [[GTSEditorModel alloc] initWithStore: [[[GTSDefaultsDomainStore alloc] init] autorelease]
                                          catalog: [self catalog]];
+  NSLog(@"%@", [_model diagnostics]);   /* which defaults root, read/write state */
   _editor = [[GTSThemeSettingsEditor alloc] initWithModel: _model];
 
   _window = [[NSWindow alloc] initWithContentRect: frame

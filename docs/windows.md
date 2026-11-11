@@ -66,9 +66,9 @@ ls ThemeSettingsKit/obj ThemeSettingsUI/obj   # expect *.dll and lib*.dll.a
 # 3. The standalone app, pointed at the example themes
 make -C ThemeSettingsApp
 openapp ./ThemeSettingsApp/ThemeSettings.app -GTSExtraThemeRoot "$PWD/examples"
-#    expect today: the app runs; every target reads "Unknown (settings could
-#    not be read)" with "this defaults backend is not supported for editing
-#    yet" (section 2)
+#    expect (section 5, pending rerun): themes and stored values shown, every
+#    row read-only; a theme change is refused with "this defaults backend is
+#    not supported for editing yet"; stderr shows the defaults root line
 ```
 
 Do **not** run `make install` into a real GNUstep domain. To try the staged
@@ -125,11 +125,43 @@ b9939d568be30d49e7641e96dd4d1a2d4c4eed49; no `make install`.
   time, and the refusal gate holds. The screenshot itself stays on the
   Windows host; it was not copied here.
 
-**Reading and editing both stay disabled on Windows** (`isBackendSupported`
-NO). The defaults are plain files, so reading could come first, as a
-separate read gate with writes still refused. To enable reading, then
-editing:
-1. replace the POSIX-only `classifyPath`/`canRead` stubs (#1) with
-   Windows-aware checks;
-2. resolve the defaults root without the user-name lookup above;
-3. rerun the store tests on a Windows host.
+**Since the read-only change (section 5), reading is enabled and editing
+stays disabled.** What remains before editing on Windows:
+1. a verified Windows write path (locking, atomic replace) and its tests
+   on a Windows host;
+2. a winuitheme rerun of the read-only change (section 5).
+
+## 5. Read-only on Windows (PENDING winuitheme rerun)
+
+Reads and writes now have separate gates in `GTSDefaultsDomainStore`.
+**Nothing in this section has run on Windows yet.**
+
+* `+isBackendReadable`: YES for the file backend on POSIX and Windows. NO
+  for a registry configuration (`:REGISTRY:` in the defaults directory)
+  and on Cygwin. When NO, reads fail as before.
+* `+isBackendWritable`: NO on Windows. Every commit or removal fails with
+  `GTSErrorUnsupportedBackend`, "this defaults backend is not supported for
+  editing yet", before anything is loaded or written. `+isBackendSupported`
+  now means the same as writable.
+* The editor model shows the stored values with every row read-only, makes
+  no theme or setting change, and the theme note says "Shown read-only:
+  settings can be read on this system but not changed here yet".
+* Windows file checks use `NSFileManager` (attributes with and without
+  following links, readable and executable checks). The policy is the same
+  as POSIX: only "does not exist" counts as absent; a dangling link or an
+  odd file type is an error.
+* **Defaults root.** It comes from `GSDefaultsRootForUser(NSUserName())`,
+  the same call this process's `NSUserDefaults` uses, so the editor and the
+  process can't disagree. For the current user gnustep-base takes the home
+  from `GNUSTEP_HOME`, then `HOMEPATH`/`HOMEDRIVE` or `USERPROFILE`. It does
+  not look up another user. The `NSHomeDirectoryForUser(agent) failed`
+  noise (section 4) means those variables were empty. The root is then
+  relative, and the store refuses any root that is not absolute.
+* Diagnostics: `+defaultsRootDescription` gives the root, how it was found
+  and the read/write state. The app and the demo log it at startup, and the
+  script verb `log` prints it as `script: diagnostics: ...`.
+* Linux evidence: `Tests/GTSReadOnlyBackendTests.m` forces "readable, not
+  writable" with the store's test switch. The store reads but refuses
+  commits and removals, nothing is written, the model shows values
+  read-only, and the diagnostics name the isolated root. A negative control
+  (the model ignoring the write gate) fails the model test.

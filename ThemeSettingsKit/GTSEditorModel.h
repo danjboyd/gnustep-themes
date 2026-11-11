@@ -116,6 +116,10 @@ typedef enum {
 - (BOOL) setTargetAppImageSidecar: (GTSAppImageSidecar*)sidecar appImage: (NSString*)appImagePath;
 - (BOOL) targetIsAppImage;
 - (BOOL) isEditable;
+/* NO where the store can read but not write (Windows today). */
+- (BOOL) storeIsWritable;
+/* One diagnostics line from the store (defaults root and read/write state). */
+- (NSString*) diagnostics;
 - (BOOL) targetIsGlobal;
 - (NSString*) targetTitle;
 - (GTSEditSession*) session;

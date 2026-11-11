@@ -55,6 +55,7 @@
       GTSDefaultsDomainStore *store = [[[GTSDefaultsDomainStore alloc]
         initWithHostDefaults: [NSUserDefaults standardUserDefaults]] autorelease];
       _model = [[GTSEditorModel alloc] initWithStore: store catalog: [self catalog]];
+      NSLog(@"%@", [_model diagnostics]);   /* which defaults root, read/write state */
       [_model setHostDomain: [self hostDomain]];
       [self targetHost];
       _editor = [[GTSThemeSettingsEditor alloc] initWithModel: _model];

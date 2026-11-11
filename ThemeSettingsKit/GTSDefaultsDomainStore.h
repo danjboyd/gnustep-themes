@@ -90,11 +90,21 @@ typedef enum {
 
 /* Absolute directory where this process reads/writes defaults. */
 + (NSString*) defaultsRoot;
-/* YES only for GNUstep's file-based defaults backend on a POSIX system,
-   which is the only one whose failure modes this store checks. Elsewhere
-   every read and write fails with GTSErrorUnsupportedBackend (read-only
-   until a backend-specific check exists). */
+/* Reads: GNUstep's file-based defaults backend, on POSIX and on Windows
+   (one plist per domain in both; Windows PENDING a rerun there). A
+   registry-backed Windows configuration is not readable. When NO, every
+   read and write fails with GTSErrorUnsupportedBackend. */
++ (BOOL) isBackendReadable;
+/* Writes: POSIX file backend only. Elsewhere commits fail with
+   GTSErrorUnsupportedBackend ("not supported for editing yet") and editors
+   show values read-only. */
++ (BOOL) isBackendWritable;
+/* Same as +isBackendWritable (kept for existing callers). */
 + (BOOL) isBackendSupported;
+/* One line for diagnostics: the root, how it was found, read/write state. */
++ (NSString*) defaultsRootDescription;
+/* Tests only: -1 restores the platform answer; 0 or 1 forces writability. */
++ (void) setBackendWritableOverrideForTesting: (int)value;
 
 /* Valid domain name: non-empty string, no '/', not starting with '.'. */
 + (BOOL) isValidDomainName: (id)name;
