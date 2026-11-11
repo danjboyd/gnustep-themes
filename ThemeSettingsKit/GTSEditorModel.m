@@ -112,7 +112,15 @@
   NSError *err = nil;
   GTSEditSession *s = [[[GTSEditSession alloc] initWithStore: _store domain: domain error: &err] autorelease];
   ASSIGN(_session, s);
-  [self setMessage: s ? nil : [err localizedDescription]];
+  if (s == nil)
+    [self setMessage: [err localizedDescription]];
+  else if (![self storeIsWritable])
+    /* Say why everything is greyed out, before anyone tries to change it:
+       disabled controls never reach the model, so a refusal message would
+       otherwise never appear (winuitheme #25867). */
+    [self setMessage: @"this defaults backend is not supported for editing yet"];
+  else
+    [self setMessage: nil];
   return s != nil;
 }
 

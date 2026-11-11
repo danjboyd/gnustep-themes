@@ -131,10 +131,10 @@ stays disabled.** What remains before editing on Windows:
    on a Windows host;
 2. a winuitheme rerun of the read-only change (section 5).
 
-## 5. Read-only on Windows (PENDING winuitheme rerun)
+## 5. Read-only on Windows (verified at 74884ee, see 5.1)
 
 Reads and writes now have separate gates in `GTSDefaultsDomainStore`.
-**Nothing in this section has run on Windows yet.**
+The Windows rerun is in 5.1.
 
 * `+isBackendReadable`: YES for the file backend on POSIX and Windows. NO
   for a registry configuration (`:REGISTRY:` in the defaults directory)
@@ -165,3 +165,28 @@ Reads and writes now have separate gates in `GTSDefaultsDomainStore`.
   commits and removals, nothing is written, the model shows values
   read-only, and the diagnostics name the isolated root. A negative control
   (the model ignoring the write gate) fails the model test.
+
+### 5.1 Windows rerun at 74884ee (winuitheme, 2026-11-11, report #25867)
+
+Windows 11 26300, MSYS2 CLANG64, run in a private GNUstep home (HOMEDRIVE
+and HOMEPATH pointing at a temporary test home); no `make install`.
+
+* **Build:** no compiler warnings, including the `_WIN32` `classifyPath`
+  and `canRead`.
+* **Defaults root:** the startup line named the private home's
+  `GNUstep/Defaults`, "readable, NOT writable (read-only)". GNUstep writes
+  the path with forward slashes.
+* **Reads:** throwaway keys written with `defaults` into that home's
+  NSGlobalDomain showed up: the Theme row read "WinUITheme", greyed out,
+  "Set for all applications", with the read-only note. Apply and Cancel
+  were greyed out.
+* **Nothing written:** NSGlobalDomain.plist kept its size and timestamp
+  through a refused theme change; only the `.lck` file was touched. The
+  throwaway keys were deleted afterwards.
+* **Gap, fixed after this run:** the message line was empty, because the
+  theme popup is disabled and a refused change never reaches the model.
+  The model now shows "this defaults backend is not supported for editing
+  yet" as soon as it loads a target it cannot write to.
+* **App fix:** the app's "Target:" label was selectable, so it took
+  keyboard focus and the theme drew a text selection on it. It is now
+  non-selectable.

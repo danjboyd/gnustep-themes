@@ -70,7 +70,7 @@
   content = [_window contentView];
 
   l = [[[NSTextField alloc] initWithFrame: NSMakeRect(16, frame.size.height - 38, 60, 20)] autorelease];
-  [l setStringValue: @"Target:"]; [l setEditable: NO]; [l setBezeled: NO]; [l setDrawsBackground: NO];
+  [l setStringValue: @"Target:"]; [l setEditable: NO]; [l setSelectable: NO]; [l setBezeled: NO]; [l setDrawsBackground: NO];
   [l setAutoresizingMask: NSViewMinYMargin];
   [content addSubview: l];
   _target = [[NSPopUpButton alloc] initWithFrame: NSMakeRect(80, frame.size.height - 42, 380, 26) pullsDown: NO];

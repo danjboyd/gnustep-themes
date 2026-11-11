@@ -73,6 +73,9 @@
 
   XCTAssertFalse([m storeIsWritable]);
   XCTAssertFalse([m isEditable]);
+  /* The reason is shown as soon as the target loads (controls are disabled,
+     so a refused edit would never reach the model to set it). */
+  XCTAssertEqualObjects([m message], @"this defaults backend is not supported for editing yet");
   XCTAssertTrue([[m rows] count] > 0, @"values are shown");
   e = [[m rows] objectEnumerator];
   while ((row = [e nextObject]) != nil)
