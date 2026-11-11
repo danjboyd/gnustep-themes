@@ -126,6 +126,14 @@ void GTSRequireIsolatedDefaults(void)
   actual = [GTSDefaultsDomainStore defaultsRoot];
   if (!GTSPathIsInside(actual, root))
     refuse([NSString stringWithFormat: @"defaults root %@ is not inside %@", actual, root]);
+  /* User library and applications too: a home-relative config would point
+     theme and app discovery at the real ~/GNUstep. */
+  {
+    NSString *lib = [NSSearchPathForDirectoriesInDomains(NSLibraryDirectory, NSUserDomainMask, YES) lastObject];
+    NSString *apps = [NSSearchPathForDirectoriesInDomains(NSApplicationDirectory, NSUserDomainMask, YES) lastObject];
+    if (!GTSPathIsInside(lib, root) || !GTSPathIsInside(apps, root))
+      refuse([NSString stringWithFormat: @"user Library %@ / Applications %@ not inside %@", lib, apps, root]);
+  }
 
   /* Child processes: verify read-only, with the same runtime and config,
      before the first child write. */

@@ -67,8 +67,14 @@ rm -rf $kept
 
 # 3. guard aborts before any write when the defaults root is outside GTS_TEST_ROOT
 mkdir -p "$work/A" "$work/B/user/Defaults"
-grep -v '^GNUSTEP_USER_CONFIG_FILE\|^GNUSTEP_USER_DEFAULTS_DIR\|^GNUSTEP_USER_DIR=' /etc/GNUstep/GNUstep.conf > "$work/B/GNUstep.conf"
+grep -v '^GNUSTEP_USER_CONFIG_FILE\|^GNUSTEP_USER_DEFAULTS_DIR\|^GNUSTEP_USER_DIR' /etc/GNUstep/GNUstep.conf > "$work/B/GNUstep.conf"
 printf 'GNUSTEP_USER_CONFIG_FILE=%s/B/user.conf\nGNUSTEP_USER_DEFAULTS_DIR=%s/B/user/Defaults\n' "$work" "$work" >> "$work/B/GNUstep.conf"
+for k in APPS:Applications ADMIN_APPS:Applications/Admin WEB_APPS:Library/WebApplications \
+         TOOLS:Tools ADMIN_TOOLS:Tools/Admin LIBRARY:Library HEADERS:Library/Headers \
+         LIBRARIES:Library/Libraries DOC:Library/Documentation \
+         DOC_MAN:Library/Documentation/man DOC_INFO:Library/Documentation/info; do
+  printf 'GNUSTEP_USER_DIR_%s=%s/user/%s\n' "${k%%:*}" "$work/B" "${k#*:}" >> "$work/B/GNUstep.conf"
+done
 printf 'GNUSTEP_USER_DIR=%s/B/user\nGNUSTEP_USER_DEFAULTS_DIR=%s/B/user/Defaults\n' "$work" "$work" > "$work/B/user.conf"
 chmod 600 "$work/B/GNUstep.conf" "$work/B/user.conf"
 make -s -C "$here/Tests/RootProbe" messages=no >/dev/null 2>&1

@@ -117,13 +117,21 @@ sysconf=${GTS_SYSTEM_CONF:-/etc/GNUstep/GNUstep.conf}
 mkdir -p "$root/user/Defaults"
 # grep: 0 = lines kept, 1 = nothing left (acceptable), >1 = read error.
 rc=0
-grep -v '^GNUSTEP_USER_CONFIG_FILE\|^GNUSTEP_USER_DEFAULTS_DIR\|^GNUSTEP_USER_DIR=' \
+grep -v '^GNUSTEP_USER_CONFIG_FILE\|^GNUSTEP_USER_DEFAULTS_DIR\|^GNUSTEP_USER_DIR' \
   "$sysconf" > "$root/GNUstep.conf" || rc=$?
 [ "$rc" -le 1 ] || fail "could not read $sysconf (grep status $rc)"
 cat >> "$root/GNUstep.conf" <<CONF
 GNUSTEP_USER_CONFIG_FILE=$root/user.conf
 GNUSTEP_USER_DEFAULTS_DIR=$root/user/Defaults
 CONF
+# User dirs absolute inside the root (Debian's are home-relative, e.g.
+# GNUSTEP_USER_DIR_LIBRARY=GNUstep/Library, which would mean the real ~/GNUstep).
+for k in APPS:Applications ADMIN_APPS:Applications/Admin WEB_APPS:Library/WebApplications \
+         TOOLS:Tools ADMIN_TOOLS:Tools/Admin LIBRARY:Library HEADERS:Library/Headers \
+         LIBRARIES:Library/Libraries DOC:Library/Documentation \
+         DOC_MAN:Library/Documentation/man DOC_INFO:Library/Documentation/info; do
+  printf 'GNUSTEP_USER_DIR_%s=%s/user/%s\n' "${k%%:*}" "$root" "${k#*:}" >> "$root/GNUstep.conf"
+done
 printf 'GNUSTEP_USER_DIR=%s\nGNUSTEP_USER_DEFAULTS_DIR=%s\n' "$root/user" "$root/user/Defaults" > "$root/user.conf"
 chmod 600 "$root/GNUstep.conf" "$root/user.conf"
 export GNUSTEP_CONFIG_FILE="$root/GNUstep.conf"

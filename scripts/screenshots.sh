@@ -14,6 +14,13 @@
 #   =I only the installed-library smoke: Kit/UI staged into a prefix inside
 #      the scratch root (make install DESTDIR=...), Tests/ExternalHost built
 #      out of tree against it, link/runtime receipts, one Apply on Xvfb.
+#   =J end to end with the REAL Adwaita theme: GTS_E2E_THEMES=<dir holding a
+#      built Adwaita.theme>, copied into the isolated user's Library/Themes;
+#      the demo app is captured before and after changing settings in its
+#      own editor pane (relaunched, since these settings apply on restart).
+# Another GNUstep (e.g. a clang/libobjc2 toolchain, which Adwaita needs):
+#   GTS_MASTER_CONF=<its GNUstep.conf> GTS_DEFAULTS_TOOL=<its defaults>,
+#   with that toolchain's GNUstep.sh sourced and the apps built with it.
 set -eu
 here=$(cd "$(dirname "$0")/.." && pwd)
 out=${1:?usage: screenshots.sh <output-dir>}
@@ -67,10 +74,19 @@ trap 'finish $?' EXIT; trap 'finish 130' INT; trap 'finish 143' TERM
 # Isolated defaults (same recipe as run-tests.sh).
 mkdir -p "$root/user/Defaults"
 rc=0
-grep -v '^GNUSTEP_USER_CONFIG_FILE\|^GNUSTEP_USER_DEFAULTS_DIR\|^GNUSTEP_USER_DIR=' \
-  /etc/GNUstep/GNUstep.conf > "$root/GNUstep.conf" || rc=$?
+grep -v '^GNUSTEP_USER_CONFIG_FILE\|^GNUSTEP_USER_DEFAULTS_DIR\|^GNUSTEP_USER_DIR' \
+  "${GTS_MASTER_CONF:-/etc/GNUstep/GNUstep.conf}" > "$root/GNUstep.conf" || rc=$?
 [ "$rc" -le 1 ] || fail "cannot read master config"
 printf 'GNUSTEP_USER_CONFIG_FILE=%s/user.conf\nGNUSTEP_USER_DEFAULTS_DIR=%s/user/Defaults\n' "$root" "$root" >> "$root/GNUstep.conf"
+# Every user path absolute inside the scratch root: a config with
+# home-relative user dirs (GNUSTEP_USER_DIR_LIBRARY=GNUstep/Library) would
+# otherwise look at the real ~/GNUstep (themes, applications).
+for k in APPS:Applications ADMIN_APPS:Applications/Admin WEB_APPS:Library/WebApplications \
+         TOOLS:Tools ADMIN_TOOLS:Tools/Admin LIBRARY:Library HEADERS:Library/Headers \
+         LIBRARIES:Library/Libraries DOC:Library/Documentation \
+         DOC_MAN:Library/Documentation/man DOC_INFO:Library/Documentation/info; do
+  printf 'GNUSTEP_USER_DIR_%s=%s/user/%s\n' "${k%%:*}" "$root" "${k#*:}" >> "$root/GNUstep.conf"
+done
 printf 'GNUSTEP_USER_DIR=%s/user\nGNUSTEP_USER_DEFAULTS_DIR=%s/user/Defaults\n' "$root" "$root" > "$root/user.conf"
 chmod 600 "$root/GNUstep.conf" "$root/user.conf"
 export GNUSTEP_CONFIG_FILE="$root/GNUstep.conf" GTS_TEST_ROOT="$root"
@@ -80,11 +96,12 @@ for d in ThemeSettingsApp ThemeSettingsDemo; do make -s -C "$here/$d" messages=n
 resolved=$("$here/Tests/RootProbe/obj/gts-root-probe")
 case "$resolved" in "$root"/*) ;; *) fail "defaults root $resolved not isolated; refusing" ;; esac
 plib=$(ldd "$here/Tests/RootProbe/obj/gts-root-probe" | awk '/libgnustep-base/{print $3}')
-[ "$plib" = "$(ldd /usr/bin/defaults | awk '/libgnustep-base/{print $3}')" ] || fail "defaults tool uses another gnustep-base"
+DEFAULTS=${GTS_DEFAULTS_TOOL:-/usr/bin/defaults}
+[ "$plib" = "$(ldd "$DEFAULTS" | awk '/libgnustep-base/{print $3}')" ] || fail "defaults tool uses another gnustep-base"
 echo "screenshots: defaults root $resolved (isolated)"
 
 # Seed a realistic state through the defaults tool (verified above).
-D() { /usr/bin/defaults "$@" >/dev/null; }
+D() { "$DEFAULTS" "$@" >/dev/null; }
 D write NSGlobalDomain GnomeThemeColorScheme force-dark          # global explicit
 D write org.example.Writer GSTheme Adwaita                        # app picks Adwaita
 D write org.example.Writer GnomeThemeAccentColor teal            # app override
@@ -124,7 +141,7 @@ APP="$here/ThemeSettingsApp/ThemeSettings.app/ThemeSettings"
 DEMO="$here/ThemeSettingsDemo/DemoNotes.app/DemoNotes"
 X="-GTSExtraThemeRoot $here/examples"
 check() {   # domain key expected label
-  got=$(/usr/bin/defaults read "$1" "$2" 2>/dev/null | sed "s/^$1 $2 //")
+  got=$("$DEFAULTS" read "$1" "$2" 2>/dev/null | sed "s/^$1 $2 //")
   if [ "$got" = "$3" ]; then echo "CHECK ok: $4 ($1 $2 = ${got:-<absent>})"
   else echo "CHECK FAILED: $4 ($1 $2 = ${got:-<absent>}, want ${3:-<absent>})"; checkfail=1; fi
 }
@@ -133,6 +150,39 @@ checkfail=0
 # I. Installed-library smoke. Stage Kit/UI into $root/stage only, build the
 #    external host from a copy in $root/host against the staged interface,
 #    check its link/runtime dependencies, run one Apply. Removed with $root.
+# J. End to end with the REAL Adwaita theme (built elsewhere; see header).
+#    Before: DemoNotes under Adwaita, light + blue. Change both settings in
+#    DemoNotes' own editor pane, Apply, check the stored values, relaunch
+#    (both settings say "Takes effect when the application restarts") and
+#    capture again. Pixels are compared by eye in the report (the pane's
+#    theme note names the isolated user copy of Adwaita.theme, so the real
+#    built theme is the one loaded); the checks here are the stored values.
+if [ "${GTS_SHOTS_ONLY:-}" = J ]; then
+  themes=${GTS_E2E_THEMES:?set GTS_E2E_THEMES to a dir holding a built Adwaita.theme}
+  [ -d "$themes/Adwaita.theme" ] || fail "no Adwaita.theme in $themes"
+  mkdir -p "$root/user/Library/Themes"
+  cp -R "$themes/Adwaita.theme" "$root/user/Library/Themes/"
+  dn=org.gnustep.themesettings.DemoNotes
+  D write $dn GSTheme Adwaita
+  D write $dn GnomeThemeColorScheme force-light
+  D write $dn GnomeThemeAccentColor blue
+  run "$DEMO" -GTSScreenshot "$out/J1-adwaita-before-light-blue.png"
+  # A throwaway staged change enables Apply, the default button, which is
+  # drawn in the accent colour; it is cancelled before the real change.
+  run "$DEMO" -GTSOpenSettings YES -GTSScript \
+    "choose adwaita.menu-style menubar; shot $out/J2-pane-before-blue.png; cancel; choose adwaita.color-scheme force-dark; choose adwaita.accent-color red; apply; log; shot $out/J3-pane-applied.png"
+  check $dn GnomeThemeColorScheme force-dark "J color scheme saved by the editor"
+  check $dn GnomeThemeAccentColor red "J accent saved by the editor"
+  run "$DEMO" -GTSScreenshot "$out/J4-adwaita-after-dark-red.png"
+  run "$DEMO" -GTSOpenSettings YES -GTSScript \
+    "choose adwaita.menu-style menubar; shot $out/J5-pane-after-dark-red.png; cancel"
+  check $dn GnomeThemeMenuStyle "" "J throwaway menu-style change was cancelled, never saved"
+  grep -h "^script:" "$root/apps.log" || true
+  ls "$out"
+  [ "$checkfail" -eq 0 ] || fail "read-back checks failed"
+  exit 0
+fi
+
 if [ "${GTS_SHOTS_ONLY:-}" = I ]; then
   stage="$root/stage"; mkdir -p "$stage" "$root/host"
   inc="$stage$(gnustep-config --variable=GNUSTEP_LOCAL_HEADERS)"
@@ -167,7 +217,7 @@ if [ "${GTS_SHOTS_ONLY:-}" = I ]; then
   done
   echo "$deps" | grep -q "not found" && { echo "CHECK FAILED: I unresolved dependency"; checkfail=1; } \
     || echo "CHECK ok: I no unresolved dependencies"
-  [ "$(echo "$deps" | awk '/libgnustep-base/{print $3}')" = "$(ldd /usr/bin/defaults | awk '/libgnustep-base/{print $3}')" ] \
+  [ "$(echo "$deps" | awk '/libgnustep-base/{print $3}')" = "$(ldd "$DEFAULTS" | awk '/libgnustep-base/{print $3}')" ] \
     && echo "CHECK ok: I same libgnustep-base as the defaults tool" || { echo "CHECK FAILED: I other libgnustep-base"; checkfail=1; }
   ldd "$hb" | grep -q "libThemeSettingsUI.so.0 => not found" \
     && echo "CHECK ok: I without the staged path the libraries are not found (no fallback copy)" \
