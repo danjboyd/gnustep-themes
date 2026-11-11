@@ -85,8 +85,11 @@ and the shadow backend alias.
 | Menu style | primary → menubar | The title-bar menu button goes, and a 36-point in-window menu bar appears (frame height 760 → 796, same content). Both menus open and close with Escape. |
 
 Sources: editor gnustep-themes 3a749f9, Gumdrop 75c8c8d, libs-back 8348401
-(csd8). The captures, read-backs and logs are in fun-themes' proof commit
-c0001fb (`Tests/Diagnostics/gumdrop-settings-proof-20261111`), not
-reproduced here. This applies to X11 with csd8, where GNUstep draws the
+(csd8). The captures (baseline-primary, radius-20, shadows-off, menubar,
+and both menus open), read-backs and logs are in fun-themes' proof commit
+c0001fb:
+[report](https://github.com/danjboyd/gnustep-funthemes/blob/c0001fb8ad7473192aff6376e175b3c58744320c/Tests/Diagnostics/gumdrop-settings-proof-20261111.md),
+[captures](https://github.com/danjboyd/gnustep-funthemes/tree/c0001fb8ad7473192aff6376e175b3c58744320c/Tests/Diagnostics/gumdrop-settings-proof-20261111).
+That repository is private, so these links work only for its members. This applies to X11 with csd8, where GNUstep draws the
 window frame. On a backend that leaves frames to the window manager,
 corners and shadows have no effect, as the help text says.
