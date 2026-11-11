@@ -183,6 +183,35 @@ if [ "${GTS_SHOTS_ONLY:-}" = J ]; then
   exit 0
 fi
 
+# K. End to end with the REAL Gumdrop theme (GTS_E2E_THEMES holds a built
+#    Gumdrop.theme). Before: DemoNotes under Gumdrop with nothing set. Then
+#    all five settings are changed in DemoNotes' own editor pane, saved,
+#    checked, and the app relaunched (font/menu apply on restart; corner
+#    radius and shadows on new windows, and only where the display backend
+#    draws them -- a plain Xvfb backend may ignore both).
+if [ "${GTS_SHOTS_ONLY:-}" = K ]; then
+  themes=${GTS_E2E_THEMES:?set GTS_E2E_THEMES to a dir holding a built Gumdrop.theme}
+  [ -d "$themes/Gumdrop.theme" ] || fail "no Gumdrop.theme in $themes"
+  mkdir -p "$root/user/Library/Themes"
+  cp -R "$themes/Gumdrop.theme" "$root/user/Library/Themes/"
+  dn=org.gnustep.themesettings.DemoNotes
+  D write $dn GSTheme Gumdrop
+  run "$DEMO" -GTSScreenshot "$out/K1-gumdrop-before.png"
+  run "$DEMO" -GTSOpenSettings YES -GTSScript \
+    "shot $out/K2-pane-before.png; choose gumdrop.menu-style menubar; type gumdrop.font DejaVuSerif; type gumdrop.font-size 20; type gumdrop.window-corner-radius 0; choose gumdrop.window-shadows NO; apply; log; shot $out/K3-pane-applied.png"
+  check $dn GumdropMenuStyle menubar "K menu style saved"
+  check $dn NSFont DejaVuSerif "K font saved"
+  check $dn NSFontSize 20 "K font size saved"
+  check $dn GSBackWindowCornerRadius 0 "K corner radius saved"
+  check $dn GSBackWindowShadows NO "K shadows saved"
+  run "$DEMO" -GTSScreenshot "$out/K4-gumdrop-after.png"
+  run "$DEMO" -GTSOpenSettings YES -GTSScript "shot $out/K5-pane-after.png"
+  grep -h "^script:" "$root/apps.log" || true
+  ls "$out"
+  [ "$checkfail" -eq 0 ] || fail "read-back checks failed"
+  exit 0
+fi
+
 if [ "${GTS_SHOTS_ONLY:-}" = I ]; then
   stage="$root/stage"; mkdir -p "$stage" "$root/host"
   inc="$stage$(gnustep-config --variable=GNUSTEP_LOCAL_HEADERS)"
