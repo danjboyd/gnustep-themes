@@ -38,24 +38,42 @@ restarts".
 
 ![Same app right after Apply](screenshots/e2e/J3-pane-applied.png)
 
-## Gumdrop (scenario K), gnustep-funthemes 5e76007, 2026-11-11
+## Gumdrop (scenarios K and L), gnustep-funthemes 5e76007, 2026-11-11
 
 The editor changed all five settings, and the read-back confirms all five
 were saved: menu style menubar, interface font DejaVuSerif, font size 20,
-corner radius 0, shadows NO. The theme loaded (its striped bar is visible).
-**No visible effect was demonstrated** with this harness:
+corner radius 0, shadows NO. The theme loaded.
 
-* **Interface font and size** (`NSFont`, `NSFontSize`): DemoNotes' text did
-  not change. Gumdrop's theme domain sets the role fonts (control content,
-  labels and so on) explicitly, and controls use those, so the general
-  interface font rarely shows. The rows' help text says role fonts keep
-  their own defaults; in practice that makes these two rows weak. Reported
-  to the theme owner.
-* **Menu style**: the capture covers a window's content only, not menus,
-  and this host has no full-screen capture tool. Not shown.
-* **Corner radius and shadows**: applied by display backends that draw the
-  window frame. The plain Xvfb backend here ignores both, as the help text
-  says. Not shown.
+**Interface font and size: visible.** After relaunch, the editor pane's own
+controls (pop-up menus, text fields, buttons, the checkbox) are drawn in
+DejaVu Serif at 20 points instead of DejaVu Sans. Standard GNUstep cells use
+the system font (`NSFont`/`NSFontSize`).
 
-Gumdrop still needs a capture of the whole screen, on a backend that draws
-window frames, with a demo that uses the role fonts.
+| Before (theme defaults) | After relaunch (DejaVuSerif, 20) |
+|---|---|
+| ![](screenshots/e2e/K2-gumdrop-pane-before.png) | ![](screenshots/e2e/K5-gumdrop-pane-after-serif-20.png) |
+
+A correction: an earlier version of this page said these rows had no
+visible effect. It looked only at DemoNotes' main window, whose text is an
+`NSTextView`, and text views use the *user* font (`NSUserFont`), not the
+system font.
+
+**Control-content font (scenario L): no visible effect on standard
+controls.** With a draft settings file that added `NSControlContentFont`
+rows, setting it to DejaVuSerif 20 left the same pane unchanged after
+relaunch. Standard cells don't ask for the control-content font, so such a
+row would mislead.
+
+| Before | After relaunch (NSControlContentFont DejaVuSerif, 20) |
+|---|---|
+| ![](screenshots/e2e/L1-gumdrop-pane-before.png) | ![](screenshots/e2e/L3-gumdrop-pane-control-font-after.png) |
+
+**Not demonstrated yet:**
+
+* **Menu style:** the captures cover a window's content only, not menus.
+* **Corner radius and shadows:** these need a backend that draws window
+  frames (`-GSX11HandlesWindowDecorations NO -GSBackWindowShadows YES`).
+  Plain Xvfb here ignores both.
+
+The owner's GNOME Shell `--x11` rig, with full-screen captures, is the plan
+for these three. This host lacks gnome-shell, xdotool and ImageMagick.

@@ -212,6 +212,30 @@ if [ "${GTS_SHOTS_ONLY:-}" = K ]; then
   exit 0
 fi
 
+# L. Gumdrop's control font, end to end. Like K, but GTS_E2E_PLIST may
+#    replace the scratch copy's ThemeSettings.plist with a draft (e.g. the
+#    nine-setting version with control/label font rows). DemoNotes' text is
+#    an NSTextView (user font), so the probe is the editor pane itself: its
+#    pop-up menus and buttons set no font and use the control font.
+if [ "${GTS_SHOTS_ONLY:-}" = L ]; then
+  themes=${GTS_E2E_THEMES:?set GTS_E2E_THEMES to a dir holding a built Gumdrop.theme}
+  [ -d "$themes/Gumdrop.theme" ] || fail "no Gumdrop.theme in $themes"
+  mkdir -p "$root/user/Library/Themes"
+  cp -R "$themes/Gumdrop.theme" "$root/user/Library/Themes/"
+  [ -z "${GTS_E2E_PLIST:-}" ] || cp "$GTS_E2E_PLIST" "$root/user/Library/Themes/Gumdrop.theme/Resources/ThemeSettings.plist"
+  dn=org.gnustep.themesettings.DemoNotes
+  D write $dn GSTheme Gumdrop
+  run "$DEMO" -GTSOpenSettings YES -GTSScript \
+    "shot $out/L1-pane-before.png; type gumdrop.control-font DejaVuSerif; type gumdrop.control-font-size 20; apply; log; shot $out/L2-pane-applied.png"
+  check $dn NSControlContentFont DejaVuSerif "L control font saved"
+  check $dn NSControlContentFontSize 20 "L control font size saved"
+  run "$DEMO" -GTSOpenSettings YES -GTSScript "shot $out/L3-pane-after-relaunch.png"
+  grep -h "^script:" "$root/apps.log" || true
+  ls "$out"
+  [ "$checkfail" -eq 0 ] || fail "read-back checks failed"
+  exit 0
+fi
+
 if [ "${GTS_SHOTS_ONLY:-}" = I ]; then
   stage="$root/stage"; mkdir -p "$stage" "$root/host"
   inc="$stage$(gnustep-config --variable=GNUSTEP_LOCAL_HEADERS)"
