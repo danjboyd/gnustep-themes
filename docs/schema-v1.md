@@ -12,7 +12,8 @@ bug to report. References:
 * `E` = `ThemeSettingsKit/GTSEditSession.m`
 * `M` = `ThemeSettingsKit/GTSEditorModel.m`
 
-Line numbers are valid at commit 31fac26 (the Q2/Q4 loader change).
+Line numbers are valid at commit 31fac26 (the Q2/Q4 loader change) and,
+unchanged, at e944135 (no S/V/R/E/M file changed in between).
 
 A theme describes its user-facing settings in a static property list,
 `ThemeSettings.plist`. Tools read it by path and never load theme code. The
