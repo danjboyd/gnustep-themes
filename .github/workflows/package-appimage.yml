@@ -1,0 +1,24 @@
+name: package-appimage
+
+# Manual only for now: no tag trigger and no release. Pinned to a
+# gnustep-packager main commit because the .themes.json sidecar support
+# (packager #127) is not in a tagged release yet.
+on:
+  workflow_dispatch:
+
+jobs:
+  package:
+    uses: danjboyd/gnustep-packager/.github/workflows/package-gnustep-app.yml@9a8c784a3366d0d05192d61946ba3580dd8b00bb
+    with:
+      manifest-path: packaging/package.manifest.json
+      backend: appimage
+      package-version: 0.1.0-dev
+      gnustep-cli-manifest-url: https://github.com/danjboyd/gnustep-cli-new/releases/download/v0.1.5/release-manifest.json
+      run-validation: true
+      run-smoke: true
+      preflight-shell: bash
+      preflight-command: |
+        sudo apt-get install -y xvfb
+        nohup Xvfb :99 -screen 0 1280x800x24 >/dev/null 2>&1 &
+        echo "DISPLAY=:99" >> "$GITHUB_ENV"
+      artifact-name: theme-settings-appimage
