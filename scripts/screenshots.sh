@@ -133,6 +133,12 @@ done
 [ "$ready" -eq 1 ] || fail "Xvfb :$dpy not ready (lock pid ${lockpid:-none}, ours $xvfb)"
 echo "screenshots: private display :$dpy"
 export DISPLAY=":$dpy"
+# Nothing Wayland-aware (GTK helpers, the Adwaita theme's GIO) may reach the
+# real desktop or session bus: X11 on the private display only.
+case "$DISPLAY" in ""|:0|:0.*|:1|:1.*) fail "refusing DISPLAY '$DISPLAY'" ;; esac
+xdpyinfo -display "$DISPLAY" >/dev/null 2>&1 || fail "private display $DISPLAY not answering"
+unset WAYLAND_DISPLAY
+export GDK_BACKEND=x11 NO_AT_BRIDGE=1 DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent
 
 run() {   # app-binary args...
   timeout 90 "$@" >>"$root/apps.log" 2>&1 || echo "screenshots: $1 exited $?" >&2
