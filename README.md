@@ -68,7 +68,8 @@ scripts/validate-theme.sh path/to/MyTheme.theme     # or the .plist itself
 
 Exit status 0 means no errors (warnings are allowed), 1 means at least one
 error, and 2 means a usage or build problem. An error means an editor would
-skip the setting or reject the file, so it is safe to use in CI.
+skip the setting or reject the file, so it is safe to use in CI. A
+ready-made GitHub Actions job for theme repos is in [docs/theme-ci.md](docs/theme-ci.md).
 
 ## Building (Linux)
 
