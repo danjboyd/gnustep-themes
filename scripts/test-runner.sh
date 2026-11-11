@@ -75,8 +75,8 @@ make -s -C "$here/Tests/RootProbe" messages=no >/dev/null 2>&1
 make -s -C "$here/Tests" messages=no >/dev/null 2>&1
 GNUSTEP_CONFIG_FILE="$work/B/GNUstep.conf" GTS_TEST_ROOT="$work/A" GTS_EXAMPLES="$here/examples" \
   GTS_ROOT_PROBE="$here/Tests/RootProbe/obj/gts-root-probe" GTS_VERIFIED_DEFAULTS_TOOL=/usr/bin/defaults \
-  LD_LIBRARY_PATH="$HOME/GNUstep/Library/Libraries" \
-  timeout 60 "$HOME/GNUstep/Tools/xctest" "$here/Tests/ThemeSettingsKitTests.bundle" >"$work/3.out" 2>&1
+  LD_LIBRARY_PATH="${XCTEST_PREFIX:-$HOME/GNUstep}/Library/Libraries" \
+  timeout 60 "${XCTEST_PREFIX:-$HOME/GNUstep}/Tools/xctest" "$here/Tests/ThemeSettingsKitTests.bundle" >"$work/3.out" 2>&1
 st=$?
 [ "$st" -ne 0 ] && ok "3 guard aborted (status $st)" || bad "3 guard did not abort"
 grep -q "REFUSING TO RUN" "$work/3.out" && ok "3 refusal reported" || bad "3 no refusal message"

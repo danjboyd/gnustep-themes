@@ -129,7 +129,7 @@ chmod 600 "$root/GNUstep.conf" "$root/user.conf"
 export GNUSTEP_CONFIG_FILE="$root/GNUstep.conf"
 export GTS_TEST_ROOT="$root"
 export GTS_EXAMPLES="$here/examples"
-export LD_LIBRARY_PATH="$HOME/GNUstep/Library/Libraries${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export LD_LIBRARY_PATH="${XCTEST_PREFIX:-$HOME/GNUstep}/Library/Libraries${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
 # Build first (building writes no defaults), then verify, then run.
 make -s -C "$here/Tests/RootProbe" messages=no >/dev/null || fail "root probe build failed"
@@ -153,7 +153,7 @@ export GTS_ROOT_PROBE="$probe"
 export GTS_VERIFIED_DEFAULTS_TOOL="$defaults_tool"
 unset GTS_DEFAULTS_TOOL
 
-xctest=${XCTEST:-$HOME/GNUstep/Tools/xctest}
+xctest=${XCTEST:-${XCTEST_PREFIX:-$HOME/GNUstep}/Tools/xctest}
 command -v setsid >/dev/null || fail "setsid is required to contain test child processes"
 setsid "$xctest" "$here/Tests/ThemeSettingsKitTests.bundle" "$@" &
 sid=$!

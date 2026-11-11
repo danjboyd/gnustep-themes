@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    name: Debian 13 (gnustep-base 1.31, gui 0.32)
+    runs-on: ubuntu-24.04
+    # Debian 13 matches the development host's GNUstep packages exactly.
+    container: debian:trixie
+    timeout-minutes: 30
+    steps:
+      - name: Install packages
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates git make clang gcc gobjc pkg-config procps util-linux \
+            gnustep-make libgnustep-base-dev libgnustep-gui-dev gnustep-base-runtime \
+            libgnutls28-dev
+
+      - uses: actions/checkout@v4
+
+      - name: Build, unit tests and schema validator (as an unprivileged user)
+        run: |
+          useradd -m ci
+          chown -R ci "$GITHUB_WORKSPACE"
+          su ci -c "cd '$GITHUB_WORKSPACE' && GTS_CI_MIN_TESTS=120 scripts/ci.sh"
