@@ -1,7 +1,7 @@
 # Platform capabilities and boundaries
 
 Status: 2026-11-10, written from evidence collected on **one** host
-(iep-platform, Debian 13, gnustep-base 1.31.1, gnustep-gui 0.32.0, GCC
+(Debian 13, gnustep-base 1.31.1, gnustep-gui 0.32.0, GCC
 libobjc, GnuTLS 3.8.9). Anything not run there is marked **UNTESTED**.
 Nothing in this document enables editing anywhere it is not already enabled.
 

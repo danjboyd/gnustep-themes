@@ -190,6 +190,11 @@ make -C Tools/ValidateSchema
 Tools/ValidateSchema/obj/gts-validate-schema path/to/Name.theme   # or the plist
 ```
 
+For CI or a quick check from a checkout, `scripts/validate-theme.sh [-q]
+<Name.theme|plist>...` builds the validator if needed and runs it. Exit
+status: 0 means no errors (warnings allowed), 1 means at least one error,
+2 means a usage or build problem.
+
 The output has one line per finding (`ERROR` or `WARNING`) and a summary.
 The exit status is 0 when there are no errors in any file, 1 when there are
 errors, and 2 on a usage error. The tool reads the file exactly like the

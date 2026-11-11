@@ -1,4 +1,4 @@
-# Screenshots (2026-11-10, iep-platform, private Xvfb :200, isolated defaults)
+# Screenshots (2026-11-11, Debian 13, private Xvfb :200, isolated defaults)
 
 Produced by `scripts/screenshots.sh <dir>`. Apps built against, and run on,
 the same Debian packages: gnustep-gui 0.32.0-3+b1 headers and runtime,

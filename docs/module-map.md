@@ -32,13 +32,13 @@ Later: SystemPreferences module reuses `ThemeSettingsUI` unchanged.
 * Theme metadata is a static `ThemeSettings.plist` (+ optional `ThemeSettings.strings`) in the theme bundle's resources, read by path; `+[GSTheme loadThemeNamed:]` is never called because it executes theme code.
 * Theme lookup order mirrors GNUstep library search order (user, local, network, system), so a USER-directory theme shadows a bundled one; shadowed copies are reported, not hidden.
 
-## Isolation for tests (host iep-platform, Debian base 1.31.1 / gui 0.32.0, GCC libobjc)
+## Isolation for tests (Debian 13 host, base 1.31.1 / gui 0.32.0, GCC libobjc)
 
 `GNUSTEP_USER_CONFIG_FILE` in the environment is **not** honoured by base 1.31 here; defaults still went to `~/GNUstep/Defaults`. What works: `GNUSTEP_CONFIG_FILE` pointing at a 0600 copy of `/etc/GNUstep/GNUstep.conf` whose `GNUSTEP_USER_CONFIG_FILE` and `GNUSTEP_USER_DEFAULTS_DIR` are absolute scratch paths. Every test/probe checks `GSDefaultsRootForUser(NSUserName())` is under the scratch root before writing and refuses otherwise.
 
 ## Status and accepted checkpoints (2026-11-10)
 
-All test evidence is **self-run** on iep-platform. The lead
+All test evidence is **self-run** on the author's Debian 13 host. The lead
 (gnustep-tools-lead) reviewed critical paths from pasted source excerpts
 only; visual review of the screenshots has not been done independently.
 

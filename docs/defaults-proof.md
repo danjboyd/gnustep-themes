@@ -1,6 +1,6 @@
 # Defaults-domain proof (2026-11-10)
 
-Host iep-platform, Debian 13: gnustep-base 1.31.1, gnustep-gui 0.32.0,
+Host: Debian 13, gnustep-base 1.31.1, gnustep-gui 0.32.0,
 gnustep-make 2.9.3, GCC libobjc, tools-xctest (~/GNUstep). Not yet repeated on
 the shared base 6479d4483 / gui 9bd1123a1.
 
