@@ -68,12 +68,25 @@ row would mislead.
 |---|---|
 | ![](screenshots/e2e/L1-gumdrop-pane-before.png) | ![](screenshots/e2e/L3-gumdrop-pane-control-font-after.png) |
 
-**Not demonstrated yet:**
+**Menu style, corner radius and shadows: visible (fun-themes, 2026-11-11).**
+fun-themes ran the same editor-to-screen check on its own host, on GNOME
+Shell `--x11` over a private Xvfb with the csd8 libs-back backend, taking
+full-screen captures (1440x1000). Each setting was written by the
+ThemeSettings editor (Apply) into a scratch GumdropDemo domain, read back
+with `defaults read`, and the app relaunched. None of the three keys was
+passed as a process argument. The backend switches were process arguments:
+`-GSX11HandlesWindowDecorations NO`, `-GSBackHandlesWindowDecorations NO`
+and the shadow backend alias.
 
-* **Menu style:** the captures cover a window's content only, not menus.
-* **Corner radius and shadows:** these need a backend that draws window
-  frames (`-GSX11HandlesWindowDecorations NO -GSBackWindowShadows YES`).
-  Plain Xvfb here ignores both.
+| Setting | Change (others held fixed) | Observed |
+|---|---|---|
+| Window corner radius | 0 → 20 (shadows YES) | Square corners become rounded: desktop pixels in a 20x20 corner go from 0 to 94. |
+| Window shadows | YES → NO (radius 0) | The shadow falloff disappears: samples just outside the frame return to the plain desktop colour, and the frame extents go from 30,30,24,36 to 0,0,0,0. |
+| Menu style | primary → menubar | The title-bar menu button goes, and a 36-point in-window menu bar appears (frame height 760 → 796, same content). Both menus open and close with Escape. |
 
-The owner's GNOME Shell `--x11` rig, with full-screen captures, is the plan
-for these three. This host lacks gnome-shell, xdotool and ImageMagick.
+Sources: editor gnustep-themes 3a749f9, Gumdrop 75c8c8d, libs-back 8348401
+(csd8). The captures, read-backs and logs are in fun-themes' proof commit
+c0001fb (`Tests/Diagnostics/gumdrop-settings-proof-20261111`), not
+reproduced here. This applies to X11 with csd8, where GNUstep draws the
+window frame. On a backend that leaves frames to the window manager,
+corners and shadows have no effect, as the help text says.
