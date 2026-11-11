@@ -54,7 +54,7 @@ only; visual review of the screenshots has not been done independently.
 | Installed Kit/UI libraries: scratch-prefix staging, out-of-tree host | 2aabcf7 | scenario I 16/16: staged-file hashes, no files in real LOCAL/USER paths, host build with no source-tree path, ldd/dladdr show both libraries from the stage, one Apply saved + read back; unit 110/110, H 14/14, harness 14/14 | yes (#22275); proves the scratch-prefix path only, not a real-domain install, stable ABI or a pane |
 | Schema v1 spec grounded in the loader (docs/schema-v1.md) + strict validator; Adwaita PR #138 head 2581c19 validates with 0 errors / 0 warnings | 26e599d | 27 fixtures, GTSSchemaValidatorTests 3/3, unit 113/113 | yes (#22591), decisions in spec section 11; loader follow-up (Q2/Q4) not started |
 | Loader skips Status typos, non-numeric/inverted Minimum/Maximum, later duplicate Keys (lead Q2/Q4) | 31fac26 | 6 new GTSSchemaTests, unit 119/119; validator output unchanged for all valid files | yes (#22853); schema v1 with these rules is what Adwaita #138 targets |
-| Editor control tags (theme popup tag 1, rows 1000+i; was a shared tag 0) and Return in a free-form field | HEAD_TBD | scenario H 20/20 (new groups 5 and 6); tag control with the old tags fails (5 clashes); unit 120/120 | pending |
+| Editor control tags (theme popup tag 1, rows 1000+i; was a shared tag 0) and Return in a free-form field | df71763 | scenario H 20/20 (new groups 5 and 6); tag control with the old tags fails (5 clashes); unit 120/120 | pending |
 
 ## Unresolved proof gaps
 
