@@ -41,8 +41,14 @@
   "launch": {
     "entryRelativePath": "app/ThemeSettings.app/ThemeSettings",
     "workingDirectory": "app/ThemeSettings.app",
-    "arguments": ["-GSTheme", "GNUstep"],
-    "pathPrepend": ["runtime/bin", "runtime/System/Tools"],
+    "arguments": [
+      "-GSTheme",
+      "GNUstep"
+    ],
+    "pathPrepend": [
+      "runtime/bin",
+      "runtime/System/Tools"
+    ],
     "env": {
       "LD_LIBRARY_PATH": {
         "value": "{@runtimeRoot}/lib:{@runtimeRoot}/System/Library/Libraries",
@@ -50,7 +56,7 @@
       },
       "GTS_HOST_THEME_ROOTS": {
         "value": "~/GNUstep/Library/Themes:/usr/local/lib/GNUstep/Themes:/usr/lib/GNUstep/Themes:/usr/GNUstep/Local/Library/Themes:/usr/GNUstep/System/Library/Themes",
-        "policy": "override"
+        "policy": "ifUnset"
       }
     }
   },
@@ -92,7 +98,12 @@
   },
   "hostDependencies": {
     "linux": {
-      "aptPackages": ["imagemagick", "libgnutls28-dev", "pkg-config"]
+      "aptPackages": [
+        "imagemagick",
+        "libgnutls28-dev",
+        "pkg-config",
+        "fonts-dejavu-core"
+      ]
     }
   },
   "backends": {
@@ -109,6 +120,22 @@
       },
       "smoke": {
         "mode": "launch-only"
+      },
+      "fonts": {
+        "bundle": [
+          {
+            "name": "DejaVu",
+            "files": [
+              "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+              "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+              "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
+              "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf"
+            ],
+            "licenseFile": "/usr/share/doc/fonts-dejavu-core/copyright",
+            "license": "Bitstream-Vera AND LicenseRef-DejaVu-public-domain",
+            "homepage": "https://dejavu-fonts.github.io/"
+          }
+        ]
       }
     }
   }
