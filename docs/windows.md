@@ -28,18 +28,16 @@ No `dlopen`, no hard-coded `/usr` or `/home` paths, and no `.so` names
 exist in the Kit, the UI library, the app or the validator. `.so` and
 `LD_LIBRARY_PATH` appear only in the Linux test scripts and docs.
 
-## 2. What works on Windows (verified 2026-11-11 at c39c935, section 4)
+## 2. What works on Windows (verified 2026-11-11 at 2d1dd10, section 5.1)
 
 * **Builds:** the Kit and UI libraries, the standalone app and the
   validator, with no warnings.
 * **Validator:** fully functional.
-* **Editor:** starts and runs, but shows **nothing** for any target. The
-  store refuses to read as well as write, because `isBackendSupported` is
-  NO (#2) and that one check guards both. Every target shows "Unknown
-  (settings could not be read)", the message "this defaults backend is not
-  supported for editing yet", and Apply and Cancel greyed out. Nothing is
-  written. (This document originally predicted read-only lists; that was
-  wrong.)
+* **Editor:** reads the file backend and shows the stored values, with
+  every row read-only. As soon as a target opens, the message line says
+  "this defaults backend is not supported for editing yet", and nothing is
+  written. (At c39c935 it read nothing at all, because one gate guarded
+  reads and writes; section 4 records that run.)
 
 ## 3. Build recipe for winuitheme (MSYS2 CLANG64)
 
@@ -190,3 +188,8 @@ and HOMEPATH pointing at a temporary test home); no `make install`.
 * **App fix:** the app's "Target:" label was selectable, so it took
   keyboard focus and the theme drew a text selection on it. It is now
   non-selectable.
+* **Both fixes verified on Windows at 2d1dd10** (winuitheme #26214): `log`
+  prints "this defaults backend is not supported for editing yet" right
+  after launch, the status line shows it, and the "Target:" label is no
+  longer highlighted under WinUITheme. The build had no warnings and the
+  run had 0 failed steps.
