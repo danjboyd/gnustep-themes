@@ -269,4 +269,18 @@ resolve(GTSSettingDescriptor *s, NSDictionary *global, NSDictionary *app, NSDict
   XCTAssertEqual([v state], GTSValueDefault);
   XCTAssertEqualObjects([v effectiveValue], GTSDefaultThemeName);
 }
+- (void) testHostThemeRootsFromPathList
+{
+  NSArray *r = [GTSThemeCatalog searchRootsFromPathList:
+    @"~/GNUstep/Library/Themes::/usr/lib/GNUstep/Themes:relative/Themes:/usr/lib/GNUstep/Themes/:/opt/x/../Themes"];
+  NSArray *paths = [r valueForKey: @"path"];
+  XCTAssertEqualObjects(paths, ([NSArray arrayWithObjects:
+    [@"~/GNUstep/Library/Themes" stringByExpandingTildeInPath],
+    @"/usr/lib/GNUstep/Themes", @"/opt/Themes", nil]),
+    @"tilde expanded; empty, relative and duplicate entries dropped: %@", paths);
+  XCTAssertEqualObjects([[r lastObject] origin], GTSOriginLocal);
+  XCTAssertEqual([[GTSThemeCatalog searchRootsFromPathList: nil] count], (NSUInteger)0);
+  XCTAssertEqual([[GTSThemeCatalog searchRootsFromPathList: @""] count], (NSUInteger)0);
+}
+
 @end

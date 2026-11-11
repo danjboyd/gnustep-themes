@@ -142,6 +142,23 @@ stringOrNil(id o)
 
 @implementation GTSThemeCatalog
 
++ (NSArray*) searchRootsFromPathList: (NSString*)list
+{
+  NSMutableArray *roots = [NSMutableArray array];
+  NSMutableSet *seen = [NSMutableSet set];
+  NSEnumerator *e = [[list componentsSeparatedByString: @":"] objectEnumerator];
+  NSString *p;
+  if (![list isKindOfClass: [NSString class]]) return roots;
+  while ((p = [e nextObject]) != nil)
+    {
+      p = [[p stringByExpandingTildeInPath] stringByStandardizingPath];
+      if ([p length] == 0 || ![p isAbsolutePath] || [seen containsObject: p]) continue;
+      [seen addObject: p];
+      [roots addObject: [GTSThemeSearchRoot rootWithPath: p origin: GTSOriginLocal]];
+    }
+  return roots;
+}
+
 + (NSArray*) defaultSearchRoots
 {
   NSMutableArray *roots = [NSMutableArray array];

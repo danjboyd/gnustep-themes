@@ -46,6 +46,9 @@
   NSString *extra = [[NSUserDefaults standardUserDefaults] stringForKey: @"GTSExtraThemeRoot"];
   if ([extra length] > 0)    /* demo/test: themes not installed system-wide */
     [roots addObject: [GTSThemeSearchRoot rootWithPath: extra origin: GTSOriginLocal]];
+  /* AppImage: the host's theme folders, read as data only (packaging/). */
+  [roots addObjectsFromArray: [GTSThemeCatalog searchRootsFromPathList:
+    [[[NSProcessInfo processInfo] environment] objectForKey: @"GTS_HOST_THEME_ROOTS"]]];
   return [[[GTSThemeCatalog alloc] initWithSearchRoots: roots] autorelease];
 }
 

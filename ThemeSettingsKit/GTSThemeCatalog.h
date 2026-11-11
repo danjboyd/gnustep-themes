@@ -71,6 +71,13 @@ extern NSString * const GTSDefaultThemeName;
    configuration (honours GNUSTEP_CONFIG_FILE). */
 + (NSArray*) defaultSearchRoots;
 
+/* Extra roots from a colon-separated list of directories (e.g. the
+   GTS_HOST_THEME_ROOTS environment variable an AppImage sets so the editor
+   can see the host's themes). "~" is expanded; empty, relative and
+   duplicate entries are dropped. Catalogs only ever read Info and
+   ThemeSettings plists from these, never theme code. Origin: Local. */
++ (NSArray*) searchRootsFromPathList: (NSString*)list;
+
 /* Roots in priority order (first wins). */
 - (id) initWithSearchRoots: (NSArray*)roots;
 - (NSArray*) searchRoots;
