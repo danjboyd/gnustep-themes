@@ -320,6 +320,19 @@ fieldText(NSTextField *f)
   [self refreshButtons];
 }
 
+/* Leaving a field (Tab, click elsewhere) with text the model refuses puts
+   the stored value back; the model's message still says why. Return is
+   handled by the field's action (textChanged:), which keeps the text. */
+- (void) controlTextDidEndEditing: (NSNotification*)n
+{
+  NSTextField *f = [n object];
+  GTSSettingRow *row = [self rowForControl: f];
+  int movement = [[[n userInfo] objectForKey: @"NSTextMovement"] intValue];
+  if (row == nil || movement == NSReturnTextMovement || _applying) return;
+  if (![_model setText: fieldText(f) forRow: row])
+    [self performSelector: @selector(reloadFromModel) withObject: nil afterDelay: 0];
+}
+
 - (NSControl*) controlOfClass: (Class)c tag: (NSInteger)tag title: (NSString*)title
 {
   NSEnumerator *e = [[_content subviews] objectEnumerator];
@@ -441,7 +454,16 @@ fieldText(NSTextField *f)
 {
   GTSSettingRow *row = [self rowForControl: sender];
   if (row == nil) return;
-  [_model setText: [sender stringValue] forRow: row];
+  if (![_model setText: [sender stringValue] forRow: row])
+    {
+      /* Refused (Return with invalid text): keep what the user typed,
+         selected so it can be retyped, and show why. Nothing is staged and
+         the stored value is untouched. Leaving the field or Revert restores
+         the stored value (controlTextDidEndEditing:, cancel:). */
+      [self refreshButtons];
+      [sender selectText: self];
+      return;
+    }
   [self reloadFromModel];
 }
 

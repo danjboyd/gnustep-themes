@@ -104,6 +104,35 @@ collectControls(NSView *v, NSMutableArray *out)
     }
 }
 
+/* Text of the (only) editable field, and whether Apply is enabled. */
+static NSString *
+editableFieldText(GTSThemeSettingsEditor *editor)
+{
+  NSMutableArray *all = [NSMutableArray array];
+  NSEnumerator *e;
+  NSControl *c;
+  collectControls([editor view], all);
+  e = [all objectEnumerator];
+  while ((c = [e nextObject]) != nil)
+    if ([c isKindOfClass: [NSTextField class]] && [(NSTextField*)c isEditable])
+      return [c stringValue];
+  return nil;
+}
+
+static BOOL
+applyButtonEnabled(GTSThemeSettingsEditor *editor)
+{
+  NSMutableArray *all = [NSMutableArray array];
+  NSEnumerator *e;
+  NSControl *c;
+  collectControls([editor view], all);
+  e = [all objectEnumerator];
+  while ((c = [e nextObject]) != nil)
+    if ([c isKindOfClass: [NSButton class]] && [[(NSButton*)c title] isEqual: @"Apply"])
+      return [c isEnabled];
+  return NO;
+}
+
 /* A Return key press, routed the way NSApp routes a key-down
    (gnustep-gui NSApplication.m -sendEvent:, NSKeyDown case): the key
    window's -performKeyEquivalent: first (where the default button
@@ -113,11 +142,11 @@ collectControls(NSView *v, NSMutableArray *out)
    for the key window; mainMenu/servicesMenu are nil here. Returns YES when
    the window really was key and NSApp routed the event itself. */
 static BOOL
-pressReturn(NSWindow *w)
+pressKey(NSWindow *w, NSString *key)
 {
   NSEvent *ev = [NSEvent keyEventWithType: NSKeyDown location: NSZeroPoint
     modifierFlags: 0 timestamp: 0 windowNumber: [w windowNumber] context: nil
-    characters: @"\r" charactersIgnoringModifiers: @"\r" isARepeat: NO keyCode: 36];
+    characters: key charactersIgnoringModifiers: key isARepeat: NO keyCode: 0];
   BOOL isKey;
   [w makeKeyWindow];
   isKey = ([NSApp keyWindow] == w);
@@ -126,10 +155,12 @@ pressReturn(NSWindow *w)
   else if ([w performKeyEquivalent: ev] == NO)
     [w sendEvent: ev];
   [[NSRunLoop currentRunLoop] runUntilDate: [NSDate dateWithTimeIntervalSinceNow: 0.2]];
-  fprintf(stderr, "host-check: Return routed %s\n",
+  fprintf(stderr, "host-check: key routed %s\n",
     isKey ? "by NSApp (window is key)" : "by replaying NSApp's key-down routing (window not key: no window manager)");
   return isKey;
 }
+
+static BOOL pressReturn(NSWindow *w) { return pressKey(w, @"\r"); }
 
 int
 main(int argc, const char **argv)
@@ -270,29 +301,26 @@ main(int argc, const char **argv)
   check([editor performScriptedAction: @"type adwaita.font-scale 3"], @"6 typed an invalid value (uncommitted)");
   pressReturn(w);
   {
-    /* Observed: the invalid text stages nothing, so Apply is disabled and
-       its key equivalent does not fire; Return goes to the field, whose
-       action is refused with the model's message. Safe: nothing written. */
-    NSMutableArray *all = [NSMutableArray array];
-    NSEnumerator *e;
-    NSControl *c;
-    NSString *fieldShows = nil;
-    BOOL applyEnabled = YES;
-    collectControls([editor view], all);
-    e = [all objectEnumerator];
-    while ((c = [e nextObject]) != nil)
-      {
-        if ([c isKindOfClass: [NSButton class]] && [[(NSButton*)c title] isEqual: @"Apply"])
-          applyEnabled = [c isEnabled];
-        if ([c isKindOfClass: [NSTextField class]] && [(NSTextField*)c isEditable])
-          fieldShows = [c stringValue];
-      }
-    fprintf(stderr, "host-check: after invalid Return: Apply %s, field shows \"%s\", message \"%s\"\n",
-      applyEnabled ? "enabled" : "disabled", [fieldShows UTF8String], [[model message] UTF8String]);
-    check([d->order count] == 0 && !applyEnabled && ![model hasChanges]
+    /* Invalid text stages nothing, so Apply is disabled and its key
+       equivalent does not fire; Return goes to the field, whose action is
+       refused. The typed text stays, selected, with the model's message;
+       nothing is written. Leaving the field (Tab) restores the stored value. */
+    NSString *shows = editableFieldText(editor);
+    NSResponder *fr = [w firstResponder];
+    NSRange sel = [fr isKindOfClass: [NSTextView class]] ? [(NSTextView*)fr selectedRange] : NSMakeRange(0, 0);
+    check([d->order count] == 0 && !applyButtonEnabled(editor) && ![model hasChanges]
       && [[storedValue(d) description] isEqual: @"1.5"],
       [NSString stringWithFormat: @"6 invalid text on Return: Apply disabled, no callbacks, stored %@ kept (callbacks: %@)",
         storedValue(d), [d->order componentsJoinedByString: @","]]);
+    check([shows isEqual: @"3"] && sel.location == 0 && sel.length == 1
+      && [[model message] rangeOfString: @"outside"].location != NSNotFound,
+      [NSString stringWithFormat: @"6 typed text kept and selected (field \"%@\", selection %lu+%lu in %@), message \"%@\"",
+        shows, (unsigned long)sel.location, (unsigned long)sel.length,
+        NSStringFromClass([fr class]), [model message]]);
+    pressKey(w, @"\t");
+    check([editableFieldText(editor) isEqual: @"1.5"] && [[storedValue(d) description] isEqual: @"1.5"],
+      [NSString stringWithFormat: @"6 leaving the field restores the stored value (field \"%@\", stored %@)",
+        editableFieldText(editor), storedValue(d)]);
   }
 
   fprintf(stderr, "host-check: %d failure(s)\n", failures);
