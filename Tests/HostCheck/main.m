@@ -82,6 +82,55 @@ retarget(HostDelegate *d)
   [d->editor reloadFromModel];
 }
 
+/* The font-scale value currently stored in the host's scratch domain. */
+static id
+storedValue(HostDelegate *d)
+{
+  GTSDomainSnapshot *s = [[[[GTSDefaultsDomainStore alloc] init] autorelease]
+    snapshotForDomain: d->domain error: NULL];
+  return [s objectForKey: @"GnomeFontScale"];
+}
+
+/* Every NSControl under v, depth first. */
+static void
+collectControls(NSView *v, NSMutableArray *out)
+{
+  NSEnumerator *e = [[v subviews] objectEnumerator];
+  NSView *sub;
+  while ((sub = [e nextObject]) != nil)
+    {
+      if ([sub isKindOfClass: [NSControl class]]) [out addObject: sub];
+      collectControls(sub, out);
+    }
+}
+
+/* A Return key press, routed the way NSApp routes a key-down
+   (gnustep-gui NSApplication.m -sendEvent:, NSKeyDown case): the key
+   window's -performKeyEquivalent: first (where the default button
+   answers), then the event's window -sendEvent: (the first responder,
+   here the field editor). With no window manager the host window cannot
+   become key, so that routing is replayed with the host window standing in
+   for the key window; mainMenu/servicesMenu are nil here. Returns YES when
+   the window really was key and NSApp routed the event itself. */
+static BOOL
+pressReturn(NSWindow *w)
+{
+  NSEvent *ev = [NSEvent keyEventWithType: NSKeyDown location: NSZeroPoint
+    modifierFlags: 0 timestamp: 0 windowNumber: [w windowNumber] context: nil
+    characters: @"\r" charactersIgnoringModifiers: @"\r" isARepeat: NO keyCode: 36];
+  BOOL isKey;
+  [w makeKeyWindow];
+  isKey = ([NSApp keyWindow] == w);
+  if (isKey)
+    [NSApp sendEvent: ev];
+  else if ([w performKeyEquivalent: ev] == NO)
+    [w sendEvent: ev];
+  [[NSRunLoop currentRunLoop] runUntilDate: [NSDate dateWithTimeIntervalSinceNow: 0.2]];
+  fprintf(stderr, "host-check: Return routed %s\n",
+    isKey ? "by NSApp (window is key)" : "by replaying NSApp's key-down routing (window not key: no window manager)");
+  return isKey;
+}
+
 int
 main(int argc, const char **argv)
 {
@@ -173,6 +222,77 @@ main(int argc, const char **argv)
     check([[s objectForKey: @"GnomeFontScale"] isEqual: @"1.25"],
       [NSString stringWithFormat: @"4 stored value kept (%@), invalid text not written or reset",
         [s objectForKey: @"GnomeFontScale"]]);
+  }
+
+  /* 5. control tags: the theme popup's tag is not shared by any row control,
+     and choosing in the first row's popup never touches the theme popup */
+  {
+    NSMutableArray *all = [NSMutableArray array];
+    NSEnumerator *e;
+    NSControl *c, *theme = nil;
+    NSInteger themeIndex = [model selectedThemeIndex], sameTag = 0, themePopups = 0;
+    collectControls([editor view], all);
+    e = [all objectEnumerator];
+    while ((c = [e nextObject]) != nil)
+      if ([c isKindOfClass: [NSPopUpButton class]] && sel_isEqual([c action], @selector(themeChanged:)))
+        { theme = c; themePopups++; }
+    e = [all objectEnumerator];
+    while ((c = [e nextObject]) != nil)
+      if (c != theme && theme != nil && [c tag] == [theme tag] && [c target] == editor)
+        sameTag++;
+    check(themePopups == 1 && sameTag == 0,
+      [NSString stringWithFormat: @"5 theme popup tag %ld unique among editor controls (%ld popup(s), %ld clash(es))",
+        (long)[theme tag], (long)themePopups, (long)sameTag]);
+    retarget(d);
+    check([editor performScriptedAction: @"choose adwaita.color-scheme force-dark"]
+      && [model selectedThemeIndex] == themeIndex
+      && [[(NSPopUpButton*)theme titleOfSelectedItem] isEqual:
+           [[[model themeChoices] objectAtIndex: themeIndex] title]],
+      @"5 first-row popup staged its own change; theme selection unchanged");
+    [editor performScriptedAction: @"cancel"];
+  }
+
+  /* 6. Return while a free-form field is still being edited. NSApp offers
+     the key to the key window's key equivalents first, so Apply (the
+     default button, key equivalent Return) runs with the text uncommitted;
+     the editor must pick that text up (pendingTexts), not lose it. */
+  retarget(d);
+  reset(d, 0);
+  check([editor performScriptedAction: @"type adwaita.font-scale 1.5"], @"6 typed a valid value (uncommitted)");
+  pressReturn(w);
+  check([d->order isEqual: [NSArray arrayWithObjects: @"legacy", @"outcome", nil]]
+    && [d->seenByOutcome kind] == GTSApplyOutcomeSaved
+    && [[storedValue(d) description] isEqual: @"1.5"] && ![model hasChanges],
+    [NSString stringWithFormat: @"6 one Return applied the typed text: Saved, stored %@ (callbacks: %@)",
+      storedValue(d), [d->order componentsJoinedByString: @","]]);
+  retarget(d);
+  reset(d, 0);
+  check([editor performScriptedAction: @"type adwaita.font-scale 3"], @"6 typed an invalid value (uncommitted)");
+  pressReturn(w);
+  {
+    /* Observed: the invalid text stages nothing, so Apply is disabled and
+       its key equivalent does not fire; Return goes to the field, whose
+       action is refused with the model's message. Safe: nothing written. */
+    NSMutableArray *all = [NSMutableArray array];
+    NSEnumerator *e;
+    NSControl *c;
+    NSString *fieldShows = nil;
+    BOOL applyEnabled = YES;
+    collectControls([editor view], all);
+    e = [all objectEnumerator];
+    while ((c = [e nextObject]) != nil)
+      {
+        if ([c isKindOfClass: [NSButton class]] && [[(NSButton*)c title] isEqual: @"Apply"])
+          applyEnabled = [c isEnabled];
+        if ([c isKindOfClass: [NSTextField class]] && [(NSTextField*)c isEditable])
+          fieldShows = [c stringValue];
+      }
+    fprintf(stderr, "host-check: after invalid Return: Apply %s, field shows \"%s\", message \"%s\"\n",
+      applyEnabled ? "enabled" : "disabled", [fieldShows UTF8String], [[model message] UTF8String]);
+    check([d->order count] == 0 && !applyEnabled && ![model hasChanges]
+      && [[storedValue(d) description] isEqual: @"1.5"],
+      [NSString stringWithFormat: @"6 invalid text on Return: Apply disabled, no callbacks, stored %@ kept (callbacks: %@)",
+        storedValue(d), [d->order componentsJoinedByString: @","]]);
   }
 
   fprintf(stderr, "host-check: %d failure(s)\n", failures);

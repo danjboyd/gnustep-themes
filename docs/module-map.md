@@ -54,13 +54,14 @@ only; visual review of the screenshots has not been done independently.
 | Installed Kit/UI libraries: scratch-prefix staging, out-of-tree host | 2aabcf7 | scenario I 16/16: staged-file hashes, no files in real LOCAL/USER paths, host build with no source-tree path, ldd/dladdr show both libraries from the stage, one Apply saved + read back; unit 110/110, H 14/14, harness 14/14 | yes (#22275); proves the scratch-prefix path only, not a real-domain install, stable ABI or a pane |
 | Schema v1 spec grounded in the loader (docs/schema-v1.md) + strict validator; Adwaita PR #138 head 2581c19 validates with 0 errors / 0 warnings | 26e599d | 27 fixtures, GTSSchemaValidatorTests 3/3, unit 113/113 | yes (#22591), decisions in spec section 11; loader follow-up (Q2/Q4) not started |
 | Loader skips Status typos, non-numeric/inverted Minimum/Maximum, later duplicate Keys (lead Q2/Q4) | 31fac26 | 6 new GTSSchemaTests, unit 119/119; validator output unchanged for all valid files | yes (#22853); schema v1 with these rules is what Adwaita #138 targets |
+| Editor control tags (theme popup tag 1, rows 1000+i; was a shared tag 0) and Return in a free-form field | HEAD_TBD | scenario H 20/20 (new groups 5 and 6); tag control with the old tags fails (5 clashes); unit 120/120 | pending |
 
 ## Unresolved proof gaps
 
 * A theme actually re-rendering after Apply: the example themes are metadata only.
 * Cross-process live propagation, and whether a host's `standardUserDefaults` sees in-app edits.
 * The same-key write race (optimistic detection only). The backend preflight is not atomic.
-* Return-to-Apply in free-form fields (only click-Apply is exercised).
+* Return-to-Apply under a real window manager: host check H replays NSApp's key-down routing because the window cannot become key without one. With that routing, one Return applies the uncommitted text, and invalid text leaves Apply disabled, so nothing is written. Open UX point: after an invalid Return the field shows the stored value again and the typed text is lost; the model's message still says why.
 * Installed libraries: runtime resolution only via LD_LIBRARY_PATH (no rpath/.pc), no real-domain install, no ABI stability (soname 0, fragile public ivars under the GCC runtime). The app and demo deliberately keep compiled-in copies.
 * Editor callbacks/field-editor behaviour under a real window manager (host check H ran without one); invalid-text refusal checked for the number type only.
 * `scripts/screenshots.sh` cannot see unmarked descendants (no session-based containment).

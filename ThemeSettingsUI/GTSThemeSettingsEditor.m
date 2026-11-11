@@ -11,6 +11,11 @@
 - (BOOL) isFlipped { return YES; }
 @end
 
+/* Control tags: the theme popup has its own tag; row i's controls carry
+   kRowTagBase + i, so no row control can be mistaken for the theme popup
+   (both used to be 0). */
+enum { kThemePopupTag = 1, kRowTagBase = 1000 };
+
 static const float kMargin = 16, kLabelW = 170, kControlW = 330, kResetW = 70, kGap = 8;
 
 static NSTextField *
@@ -42,9 +47,9 @@ wrappedHeight(NSString *text, float width, float size)
 }
 
 @interface GTSThemeSettingsEditor (Private)
-- (NSView*) firstPopup;
 - (void) refreshButtons;
 - (NSArray*) editableFields;
+- (GTSSettingRow*) rowForControl: (id)control;
 - (NSArray*) pendingTexts;
 @end
 
@@ -159,6 +164,7 @@ wrappedHeight(NSString *text, float width, float size)
   [_content addSubview: t];
   p = [self popupWithChoices: [_model themeChoices] selected: [_model selectedThemeIndex]
                        frame: NSMakeRect(x2, y, kControlW, 26)];
+  [p setTag: kThemePopupTag];
   [p setTarget: self];
   [p setAction: @selector(themeChanged:)];
   [p setEnabled: editable];
@@ -208,7 +214,7 @@ wrappedHeight(NSString *text, float width, float size)
           NSTextField *f = [[[NSTextField alloc] initWithFrame: NSMakeRect(x2, y, kControlW, 24)] autorelease];
           [f setStringValue: [row text] ? [row text] : @""];
           [[f cell] setPlaceholderString: [[[row choices] objectAtIndex: 0] title]];
-          [f setTag: i];
+          [f setTag: kRowTagBase + i];
           [f setTarget: self];
           [f setAction: @selector(textChanged:)];
           [f setDelegate: self];          /* stage on every keystroke, see controlTextDidChange: */
@@ -219,7 +225,7 @@ wrappedHeight(NSString *text, float width, float size)
         {
           p = [self popupWithChoices: [row choices] selected: [row selectedIndex]
                                frame: NSMakeRect(x2, y, kControlW, 26)];
-          [p setTag: i];
+          [p setTag: kRowTagBase + i];
           [p setTarget: self];
           [p setAction: @selector(choiceChanged:)];
           [p setEnabled: rowEditable];
@@ -228,7 +234,7 @@ wrappedHeight(NSString *text, float width, float size)
 
       reset = [[[NSButton alloc] initWithFrame: NSMakeRect(x3, y, kResetW, 26)] autorelease];
       [reset setTitle: @"Reset"];
-      [reset setTag: i];
+      [reset setTag: kRowTagBase + i];
       [reset setTarget: self];
       [reset setAction: @selector(resetRow:)];
       [reset setEnabled: rowEditable && [row canReset]];
@@ -297,14 +303,20 @@ fieldText(NSTextField *f)
   NSEnumerator *e = [[self editableFields] objectEnumerator];
   NSTextField *f;
   while ((f = [e nextObject]) != nil)
-    [a addObject: [NSArray arrayWithObjects: [_rows objectAtIndex: [f tag]], fieldText(f), nil]];
+    {
+      GTSSettingRow *row = [self rowForControl: f];
+      if (row != nil)
+        [a addObject: [NSArray arrayWithObjects: row, fieldText(f), nil]];
+    }
   return a;
 }
 
 - (void) controlTextDidChange: (NSNotification*)n
 {
   NSTextField *f = [n object];
-  [_model setText: fieldText(f) forRow: [_rows objectAtIndex: [f tag]]];
+  GTSSettingRow *row = [self rowForControl: f];
+  if (row == nil) return;
+  [_model setText: fieldText(f) forRow: row];
   [self refreshButtons];
 }
 
@@ -346,7 +358,7 @@ fieldText(NSTextField *f)
     {
       NSArray *vals = [[_model themeChoices] valueForKey: @"value"];
       NSUInteger i = [vals indexOfObject: [w objectAtIndex: 1]];
-      NSPopUpButton *p = (NSPopUpButton*)[self firstPopup];   /* theme popup is laid out first */
+      NSPopUpButton *p = (NSPopUpButton*)[self controlOfClass: [NSPopUpButton class] tag: kThemePopupTag title: nil];
       if (i == NSNotFound || p == nil || ![p isEnabled]) return NO;
       [p selectItemAtIndex: i];
       [p sendAction: [p action] to: [p target]];
@@ -361,7 +373,7 @@ fieldText(NSTextField *f)
       NSTextField *f = nil, *x;
       NSText *ed;
       while ((x = [e nextObject]) != nil)
-        if ([x tag] == r) f = x;
+        if ([x tag] == kRowTagBase + r) f = x;
       if (r < 0 || f == nil || ![f isEnabled]) return NO;
       [[_view window] makeFirstResponder: f];
       ed = [f currentEditor];
@@ -377,7 +389,7 @@ fieldText(NSTextField *f)
       if (r < 0) return NO;
       row = [_rows objectAtIndex: r];
       if ([verb isEqual: @"reset"])
-        c = [self controlOfClass: [NSButton class] tag: r title: @"Reset"];
+        c = [self controlOfClass: [NSButton class] tag: kRowTagBase + r title: @"Reset"];
       else
         {
           NSString *val = [[w subarrayWithRange: NSMakeRange(2, [w count] - 2)] componentsJoinedByString: @" "];
@@ -385,9 +397,8 @@ fieldText(NSTextField *f)
           NSEnumerator *e = [[_content subviews] objectEnumerator];
           NSView *v;
           NSPopUpButton *p = nil;
-          /* row popups come after the theme popup; match by tag */
           while ((v = [e nextObject]) != nil)
-            if ([v isKindOfClass: [NSPopUpButton class]] && [(NSControl*)v tag] == r && v != [self firstPopup])
+            if ([v isKindOfClass: [NSPopUpButton class]] && [(NSControl*)v tag] == kRowTagBase + r)
               p = (NSPopUpButton*)v;
           for (i = 0; i < n; i++)
             if ([[[[row choices] objectAtIndex: i] value] isEqual: val]) break;
@@ -403,13 +414,13 @@ fieldText(NSTextField *f)
   return NO;
 }
 
-- (NSView*) firstPopup
+/* The row a control belongs to, or nil for any control that is not a row
+   control (the theme popup, the buttons, labels). */
+- (GTSSettingRow*) rowForControl: (id)control
 {
-  NSEnumerator *e = [[_content subviews] objectEnumerator];
-  NSView *v;
-  while ((v = [e nextObject]) != nil)
-    if ([v isKindOfClass: [NSPopUpButton class]]) return v;
-  return nil;
+  NSInteger i = [control tag] - kRowTagBase;
+  if ([control tag] < kRowTagBase || i >= (NSInteger)[_rows count]) return nil;
+  return [_rows objectAtIndex: i];
 }
 
 - (void) themeChanged: (id)sender
@@ -420,21 +431,25 @@ fieldText(NSTextField *f)
 
 - (void) choiceChanged: (id)sender
 {
-  GTSSettingRow *row = [_rows objectAtIndex: [sender tag]];
+  GTSSettingRow *row = [self rowForControl: sender];
+  if (row == nil) return;
   [_model selectChoiceAtIndex: [sender indexOfSelectedItem] forRow: row];
   [self reloadFromModel];
 }
 
 - (void) textChanged: (id)sender
 {
-  GTSSettingRow *row = [_rows objectAtIndex: [sender tag]];
+  GTSSettingRow *row = [self rowForControl: sender];
+  if (row == nil) return;
   [_model setText: [sender stringValue] forRow: row];
   [self reloadFromModel];
 }
 
 - (void) resetRow: (id)sender
 {
-  [_model resetRow: [_rows objectAtIndex: [sender tag]]];
+  GTSSettingRow *row = [self rowForControl: sender];
+  if (row == nil) return;
+  [_model resetRow: row];
   [self reloadFromModel];
 }
 
