@@ -95,10 +95,15 @@ typedef enum {
    registry-backed Windows configuration is not readable. When NO, every
    read and write fails with GTSErrorUnsupportedBackend. */
 + (BOOL) isBackendReadable;
-/* Writes: POSIX file backend only. Elsewhere commits fail with
-   GTSErrorUnsupportedBackend ("not supported for editing yet") and editors
-   show values read-only. */
+/* Writes: the POSIX file backend; on Windows (MinGW, not Cygwin) the file
+   backend only when GTS_ENABLE_WINDOWS_WRITES=1 is set (opt-in, PENDING a
+   winuitheme rerun). Elsewhere commits fail with GTSErrorUnsupportedBackend
+   ("not supported for editing yet") and editors show values read-only.
+   Every write is read back from the domain file and must match. */
 + (BOOL) isBackendWritable;
+/* The Windows write gate as a pure function, so it can be tested anywhere:
+   YES only for an absolute, non-registry root with the opt-in set to "1". */
++ (BOOL) windowsWritesAllowedForRoot: (NSString*)root environment: (NSDictionary*)env;
 /* Same as +isBackendWritable (kept for existing callers). */
 + (BOOL) isBackendSupported;
 /* One line for diagnostics: the root, how it was found, read/write state. */
@@ -127,7 +132,8 @@ typedef enum {
      that is not a property list, baseline of another domain;
    - GTSErrorUnreadableDomain: the domain could not be read reliably;
    - GTSErrorConflict: a changed key moved since baseline (*conflicts set);
-   GTSErrorWriteFailed: -synchronize reported failure (state unknown).
+   GTSErrorWriteFailed: -synchronize reported failure, or the domain file
+   did not read back with the new values (state unknown).
    Pass baseline nil to skip conflict detection (still preserves unrelated
    keys). */
 - (BOOL) commitChanges: (NSDictionary*)changes

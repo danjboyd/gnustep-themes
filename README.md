@@ -91,7 +91,7 @@ Unit tests use XCTest from
 everything CI runs:
 
 ```sh
-scripts/ci.sh            # build, 124 unit tests, schema validator
+scripts/ci.sh            # build, 128 unit tests, schema validator
 ```
 
 Tests never touch your real defaults: each run uses a scratch defaults root
@@ -110,8 +110,10 @@ application.
 
 The libraries, the app and the validator build with MSYS2 CLANG64; the
 recipe and the portability audit are in [docs/windows.md](docs/windows.md).
-**Editing is disabled on Windows for now**: the editor shows settings
-read-only until the defaults store has been verified there.
+**Editing is off by default on Windows**: the editor shows settings
+read-only. An opt-in write path (`GTS_ENABLE_WINDOWS_WRITES=1`, file
+backend only, every write read back) exists but is **pending a Windows
+rerun**; see [docs/windows.md](docs/windows.md) section 6.
 
 ## Status
 

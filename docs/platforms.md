@@ -10,8 +10,8 @@ Nothing in this document enables editing anywhere it is not already enabled.
 | Capability | Linux (Debian, base 1.31.1) | Windows (MSYS2) | macOS |
 |---|---|---|---|
 | Exact-domain read (fresh `NSUserDefaults` instance + file-backend preflight) | Tested (unit + two-process) | Works, read-only (verified at 2d1dd10, windows.md section 5) | UNTESTED; see note below |
-| Exact-domain write (per-key merge, optimistic conflict check) | Tested; same-key race documented | Disabled (UnsupportedBackend); `isBackendWritable` = NO | UNTESTED |
-| Fail-closed on unreadable/corrupt domain | Tested (mode 000, truncated plist, dir 000, dangling link, EACCES ancestor) | n/a (disabled) | UNTESTED |
+| Exact-domain write (per-key merge, optimistic conflict check) | Tested; same-key race documented | Off by default (read-only). Opt-in with `GTS_ENABLE_WINDOWS_WRITES=1`, file backend only, read-back after every write: **pending winuitheme rerun** (windows.md section 6) | UNTESTED |
+| Fail-closed on unreadable/corrupt domain | Tested (mode 000, truncated plist, dir 000, dangling link, EACCES ancestor) | Same checks via `NSFileManager`; **pending winuitheme rerun** | UNTESTED |
 | Defaults-store identity (`GSDefaultsRootForUser`) | Tested; isolation via `GNUSTEP_CONFIG_FILE` only (env `GNUSTEP_USER_CONFIG_FILE` ignored) | Files under `%USERPROFILE%\GNUstep\Defaults`, not the registry (verified, windows.md section 4); the startup diagnostics line names the root | UNTESTED |
 | Theme discovery (search order user > local > network > system; shadowing) | Tested (synthetic roots) | UNTESTED (path layout differs) | UNTESTED |
 | ThemeSettings.plist loading (no theme code loaded) | Tested | Expected to be portable Foundation code; UNTESTED | Same; UNTESTED |
@@ -78,9 +78,10 @@ before editing there.
 6. WinUITheme's native-dialog keys only do anything on Windows. The
    editor already shows the owner's help text; whether it applies there is
    not verified.
-Until all of this is done: `isBackendSupported` returns NO on
-`_WIN32`/`__MINGW32__`/`__CYGWIN__`, so every read and write fails with
-`GTSErrorUnsupportedBackend`.
+Until the rerun passes, `isBackendWritable` (and `isBackendSupported`)
+is NO on Windows unless `GTS_ENABLE_WINDOWS_WRITES=1` is set, and always
+NO on Cygwin, so commits fail with `GTSErrorUnsupportedBackend`. The
+opt-in write path (windows.md section 6) is **pending winuitheme rerun**.
 
 ## macOS: requirements before enabling
 
