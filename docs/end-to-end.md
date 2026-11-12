@@ -111,8 +111,11 @@ size or font arguments, and full-screen captures were taken.
 The captures differ visibly. Controls with app-authored fixed frames kept
 their exact sizes, and the window shrank from 760 to 747 points high. Scope:
 Linux, GNOME/X11 with csd8, 96 DPI, application domain only. No global-domain
-or Windows proof is claimed. The proof is in fun-themes' local commit cdb9c9d
-(not yet pushed); its settings file is public at
+or Windows proof is claimed. The captures, read-backs and results are in
+fun-themes' proof commit cdb9c9d:
+[report](https://github.com/danjboyd/gnustep-funthemes/blob/cdb9c9d01066be7c704a9ba3a7b4fc1733f57cae/Tests/Diagnostics/gumdrop-density-setting-proof-20261111.md),
+[captures](https://github.com/danjboyd/gnustep-funthemes/tree/cdb9c9d01066be7c704a9ba3a7b4fc1733f57cae/Tests/Diagnostics/gumdrop-density-setting-proof-20261111)
+(private repository, members only). Its settings file is at
 [5fd5fa6](https://github.com/danjboyd/gnustep-funthemes/blob/5fd5fa64802a0325d713a4ec3201b437a4b4a5cd/Themes/Gumdrop/ThemeSettings.plist),
 which `examples/Gumdrop.theme` now mirrors byte for byte.
 
