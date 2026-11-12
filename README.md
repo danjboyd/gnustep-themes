@@ -91,11 +91,14 @@ Unit tests use XCTest from
 everything CI runs:
 
 ```sh
-scripts/ci.sh            # build, 120 unit tests, schema validator
+scripts/ci.sh            # build, 124 unit tests, schema validator
 ```
 
 Tests never touch your real defaults: each run uses a scratch defaults root
-and checks that it did. `scripts/screenshots.sh` drives the real GUI on a
+and checks that it did. gnustep-base ignores `HOME`, so the runners also set
+`GNUSTEP_HOME` inside the scratch root and refuse to run if a gnustep-base
+that honours it resolves elsewhere. (Debian's 1.31.1 ignores `GNUSTEP_HOME`
+too; there every user path is set absolute in a private config instead.) `scripts/screenshots.sh` drives the real GUI on a
 private Xvfb display and is not part of CI.
 
 To install the libraries somewhere other than a real GNUstep domain, use

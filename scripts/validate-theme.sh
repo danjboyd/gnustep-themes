@@ -39,7 +39,7 @@ master=$(gnustep-config --variable=GNUSTEP_CONFIG_FILE 2>/dev/null || true)
 [ -r "${master:-}" ] || master=/etc/GNUstep/GNUstep.conf
 priv=$(mktemp -d "${TMPDIR:-/tmp}/gts-validate.XXXXXX") || { echo "$0: no temp dir" >&2; exit 2; }
 trap 'rm -rf "$priv"' EXIT INT TERM
-mkdir -p "$priv/user/Defaults"
+mkdir -p "$priv/user/Defaults" "$priv/home"
 { grep -v '^GNUSTEP_USER_CONFIG_FILE\|^GNUSTEP_USER_DEFAULTS_DIR\|^GNUSTEP_USER_DIR' "$master" 2>/dev/null || true
   printf 'GNUSTEP_USER_CONFIG_FILE=%s/none.conf\nGNUSTEP_USER_DEFAULTS_DIR=%s/user/Defaults\nGNUSTEP_USER_DIR_LIBRARY=%s/user/Library\n' "$priv" "$priv" "$priv"
 } > "$priv/GNUstep.conf"
@@ -52,4 +52,5 @@ case "$root" in
   "$priv"/*) ;;
   *) echo "$0: could not isolate the validator's defaults (got '${root:-nothing}'); refusing to run" >&2; exit 2 ;;
 esac
-GNUSTEP_CONFIG_FILE="$priv/GNUstep.conf" "$tool" "$@"
+# gnustep-base ignores HOME; NSHomeDirectory() uses GNUSTEP_HOME, else passwd.
+GNUSTEP_HOME="$priv/home" GNUSTEP_CONFIG_FILE="$priv/GNUstep.conf" "$tool" "$@"

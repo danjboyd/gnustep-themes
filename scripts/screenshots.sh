@@ -89,13 +89,21 @@ for k in APPS:Applications ADMIN_APPS:Applications/Admin WEB_APPS:Library/WebApp
 done
 printf 'GNUSTEP_USER_DIR=%s/user\nGNUSTEP_USER_DEFAULTS_DIR=%s/user/Defaults\n' "$root" "$root" > "$root/user.conf"
 chmod 600 "$root/GNUstep.conf" "$root/user.conf"
-export GNUSTEP_CONFIG_FILE="$root/GNUstep.conf" GTS_TEST_ROOT="$root"
+# gnustep-base ignores HOME (NSHomeDirectory() uses GNUSTEP_HOME, else passwd).
+mkdir -p "$root/home"
+export GNUSTEP_CONFIG_FILE="$root/GNUstep.conf" GTS_TEST_ROOT="$root" GNUSTEP_HOME="$root/home"
 
 make -s -C "$here/Tests/RootProbe" messages=no >/dev/null
 for d in ThemeSettingsApp ThemeSettingsDemo; do make -s -C "$here/$d" messages=no >/dev/null; done
 resolved=$("$here/Tests/RootProbe/obj/gts-root-probe")
 case "$resolved" in "$root"/*) ;; *) fail "defaults root $resolved not isolated; refusing" ;; esac
 plib=$(ldd "$here/Tests/RootProbe/obj/gts-root-probe" | awk '/libgnustep-base/{print $3}')
+# Builds that honour GNUSTEP_HOME must land inside the root (Debian's 1.31.1
+# ignores it; there the absolute defaults/user dirs above are the isolation).
+home=$("$here/Tests/RootProbe/obj/gts-root-probe" -home)
+case "$home" in "$root"/*) ;; *)
+  strings "$plib" 2>/dev/null | grep -qx GNUSTEP_HOME && fail "GNUstep home $home not isolated; refusing"
+  echo "screenshots: note: gnustep-base ignores GNUSTEP_HOME (home $home)" ;; esac
 DEFAULTS=${GTS_DEFAULTS_TOOL:-/usr/bin/defaults}
 [ "$plib" = "$(ldd "$DEFAULTS" | awk '/libgnustep-base/{print $3}')" ] || fail "defaults tool uses another gnustep-base"
 echo "screenshots: defaults root $resolved (isolated)"

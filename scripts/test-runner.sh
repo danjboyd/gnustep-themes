@@ -79,7 +79,8 @@ printf 'GNUSTEP_USER_DIR=%s/B/user\nGNUSTEP_USER_DEFAULTS_DIR=%s/B/user/Defaults
 chmod 600 "$work/B/GNUstep.conf" "$work/B/user.conf"
 make -s -C "$here/Tests/RootProbe" messages=no >/dev/null 2>&1
 make -s -C "$here/Tests" messages=no >/dev/null 2>&1
-GNUSTEP_CONFIG_FILE="$work/B/GNUstep.conf" GTS_TEST_ROOT="$work/A" GTS_EXAMPLES="$here/examples" \
+mkdir -p "$work/B/home"
+GNUSTEP_HOME="$work/B/home" GNUSTEP_CONFIG_FILE="$work/B/GNUstep.conf" GTS_TEST_ROOT="$work/A" GTS_EXAMPLES="$here/examples" \
   GTS_ROOT_PROBE="$here/Tests/RootProbe/obj/gts-root-probe" GTS_VERIFIED_DEFAULTS_TOOL=/usr/bin/defaults \
   LD_LIBRARY_PATH="${XCTEST_PREFIX:-$HOME/GNUstep}/Library/Libraries" \
   timeout 60 "${XCTEST_PREFIX:-$HOME/GNUstep}/Tools/xctest" "$here/Tests/ThemeSettingsKitTests.bundle" >"$work/3.out" 2>&1
