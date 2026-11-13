@@ -190,11 +190,25 @@ static int gWritableOverride = -1;
 #endif
 }
 
++ (BOOL) windowsWritesAllowedForRoot: (NSString*)root environment: (NSDictionary*)env
+{
+  /* Locking and the atomic file replace are gnustep-base's own (the same
+     -synchronize as on POSIX); the store adds the read-back check. Opt-in
+     until winuitheme's rerun verifies base's behaviour on Windows. */
+  return [root isKindOfClass: [NSString class]] && [root isAbsolutePath]
+    && [root rangeOfString: @":REGISTRY:"].length == 0
+    && [[env objectForKey: @"GTS_ENABLE_WINDOWS_WRITES"] isEqual: @"1"];
+}
+
 + (BOOL) isBackendWritable
 {
   if (gWritableOverride >= 0) return gWritableOverride ? YES : NO;
-#if defined(_WIN32) || defined(__MINGW32__) || defined(__CYGWIN__)
-  return NO;   /* writes not verified on Windows; no Windows write path yet */
+#if defined(__CYGWIN__)
+  return NO;
+#elif defined(_WIN32)
+  return [self isBackendReadable]
+    && [self windowsWritesAllowedForRoot: [self defaultsRoot]
+                             environment: [[NSProcessInfo processInfo] environment]];
 #else
   return YES;
 #endif
@@ -556,6 +570,35 @@ classifyPath(NSString *path, NSString **why)
         domainName);
       return NO;
     }
+  /* Read the file back with the same strict checks as a load: every changed
+     key must hold its new value and every removed key must be gone. A
+     backend that reports success without writing (or writes elsewhere) is
+     caught here on any platform. */
+  {
+    NSDictionary *onDisk = nil;
+    NSError *why = nil;
+    NSString *bad = nil;
+    if (![self checkBackendForDomain: domainName fileValues: &onDisk error: &why])
+      bad = [why localizedDescription];
+    else
+      {
+        e = [changes keyEnumerator];
+        while (bad == nil && (k = [e nextObject]) != nil)
+          {
+            id v = [changes objectForKey: k];
+            id got = [onDisk objectForKey: k];
+            if (v == GTSRemoveValue ? (got != nil) : !sameValue(v, got))
+              bad = [NSString stringWithFormat: @"%@ reads back as %@", k, got ? got : @"(unset)"];
+          }
+      }
+    if (bad != nil)
+      {
+        if (error) *error = storeError(GTSErrorWriteFailed,
+          @"defaults domain %@ did not read back as written (%@); its state is unknown, reload before retrying",
+          domainName, bad);
+        return NO;
+      }
+  }
   return YES;
 }
 

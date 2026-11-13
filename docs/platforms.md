@@ -9,14 +9,14 @@ Nothing in this document enables editing anywhere it is not already enabled.
 
 | Capability | Linux (Debian, base 1.31.1) | Windows (MSYS2) | macOS |
 |---|---|---|---|
-| Exact-domain read (fresh `NSUserDefaults` instance + file-backend preflight) | Tested (unit + two-process) | UNTESTED; store refuses: `isBackendSupported` = NO | UNTESTED; see note below |
-| Exact-domain write (per-key merge, optimistic conflict check) | Tested; same-key race documented | Disabled (UnsupportedBackend) | UNTESTED |
-| Fail-closed on unreadable/corrupt domain | Tested (mode 000, truncated plist, dir 000, dangling link, EACCES ancestor) | n/a (disabled) | UNTESTED |
-| Defaults-store identity (`GSDefaultsRootForUser`) | Tested; isolation via `GNUSTEP_CONFIG_FILE` only (env `GNUSTEP_USER_CONFIG_FILE` ignored) | UNTESTED; base may use the registry | UNTESTED |
+| Exact-domain read (fresh `NSUserDefaults` instance + file-backend preflight) | Tested (unit + two-process) | Works, read-only (verified at 2d1dd10, windows.md section 5) | UNTESTED; see note below |
+| Exact-domain write (per-key merge, optimistic conflict check) | Tested; same-key race documented | Off by default (read-only). Opt-in with `GTS_ENABLE_WINDOWS_WRITES=1`, file backend only, read-back after every write: **pending winuitheme rerun** (windows.md section 6) | UNTESTED |
+| Fail-closed on unreadable/corrupt domain | Tested (mode 000, truncated plist, dir 000, dangling link, EACCES ancestor) | Same checks via `NSFileManager`; **pending winuitheme rerun** | UNTESTED |
+| Defaults-store identity (`GSDefaultsRootForUser`) | Tested; isolation via `GNUSTEP_CONFIG_FILE` only (env `GNUSTEP_USER_CONFIG_FILE` ignored) | Files under `%USERPROFILE%\GNUstep\Defaults`, not the registry (verified, windows.md section 4); the startup diagnostics line names the root | UNTESTED |
 | Theme discovery (search order user > local > network > system; shadowing) | Tested (synthetic roots) | UNTESTED (path layout differs) | UNTESTED |
 | ThemeSettings.plist loading (no theme code loaded) | Tested | Expected to be portable Foundation code; UNTESTED | Same; UNTESTED |
 | AppImage sidecar reading | Tested (stand-in artifacts); spec = packager main 776cb2e | n/a (AppImage is Linux-only) | n/a |
-| SHA-256 for sidecar binding | GnuTLS via `gts-config.make` (explicit pkg-config detect + link) | UNTESTED; GnuTLS availability in the MSYS2 base not checked | UNTESTED; GnuTLS not assumed |
+| SHA-256 for sidecar binding | GnuTLS via `gts-config.make` (explicit pkg-config detect + link) | GnuTLS is in MSYS2 CLANG64 and the code builds without warnings since the `_wfopen` fix (c39c935); hashing itself not exercised | UNTESTED; GnuTLS not assumed |
 | AppKit editor rendering | Tested on private Xvfb, default GNUstep theme | UNTESTED | UNTESTED |
 
 ## Linux: what is established
@@ -57,30 +57,31 @@ Nothing in this document enables editing anywhere it is not already enabled.
 
 ## Windows (MSYS2): requirements before enabling
 
-Static audit and a build recipe: docs/windows.md (2026-11-10). The Kit now
-compiles its POSIX-only store checks only off Windows, and domain names may
-not contain `\` (or `:` on Windows). Both are untested on Windows.
+Audit, build recipe and Windows runs: docs/windows.md. Reading works on
+Windows (read-only, verified at 2d1dd10); these steps are what remains
+before editing there.
 
-1. Find out which defaults backend the target gnustep-base build uses:
-   the registry, or files under the user's GNUstep defaults directory. Do this
-   from source and from a sandboxed test on a Windows runner.
+1. **Answered:** the MSYS2 gnustep-base keeps defaults as files under
+   `%USERPROFILE%\GNUstep\Defaults`, not the registry (winuitheme #24772,
+   windows.md section 4).
 2. Implement a backend-specific preflight equivalent to the Linux one
    (absent vs unreadable vs corrupt), or keep the platform read-only. The
    file-layout check must not be reused blindly.
 3. Repeat the two-process proof: per-key merge, stale caching, unreadable
    domain behaviour.
-4. Pick the SHA-256 backend: GnuTLS if the MSYS2 base carries it, or
-   Windows CNG. Detect it explicitly. The binding stays "unchecked" while
-   none is available. (Sidecars are AppImage-only, so this matters only if
-   another packaging format adopts the same scheme.)
+4. **Answered:** GnuTLS is available in MSYS2 CLANG64, and GTSSHA256 builds
+   cleanly there since the `_wfopen` fix (c39c935). (Sidecars are
+   AppImage-only, so hashing on Windows matters only if another packaging
+   format adopts the same scheme.)
 5. Theme search roots: confirm `NSSearchPathForDirectoriesInDomains` results
    and user-over-system shadowing on Windows layouts.
 6. WinUITheme's native-dialog keys only do anything on Windows. The
    editor already shows the owner's help text; whether it applies there is
    not verified.
-Until all of this is done: `isBackendSupported` returns NO on
-`_WIN32`/`__MINGW32__`/`__CYGWIN__`, so every read and write fails with
-`GTSErrorUnsupportedBackend`.
+Until the rerun passes, `isBackendWritable` (and `isBackendSupported`)
+is NO on Windows unless `GTS_ENABLE_WINDOWS_WRITES=1` is set, and always
+NO on Cygwin, so commits fail with `GTSErrorUnsupportedBackend`. The
+opt-in write path (windows.md section 6) is **pending winuitheme rerun**.
 
 ## macOS: requirements before enabling
 

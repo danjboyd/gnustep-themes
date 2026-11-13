@@ -95,8 +95,9 @@
   XCTAssertTrue([[model themeNote] rangeOfString: @"not confirmed as the AppImage's current settings"].location != NSNotFound);
   XCTAssertTrue([[model themeNote] rangeOfString: @"matches this AppImage"].location != NSNotFound);
   XCTAssertTrue([[model themeNote] rangeOfString: @"is not known"].location != NSNotFound, @"compatibility unknown");
-  /* Gumdrop's example describes 5 settings; only menu style is set here. */
-  XCTAssertEqual([[model rows] count], (NSUInteger)5);
+  /* One row per setting in Gumdrop's example (owner's file, 6 settings at
+     5fd5fa6); only menu style is set here. */
+  XCTAssertEqual([[model rows] count], (NSUInteger)6);
   {
     NSEnumerator *e = [[model rows] objectEnumerator];
     GTSSettingRow *row, *menu = nil;

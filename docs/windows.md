@@ -28,18 +28,17 @@ No `dlopen`, no hard-coded `/usr` or `/home` paths, and no `.so` names
 exist in the Kit, the UI library, the app or the validator. `.so` and
 `LD_LIBRARY_PATH` appear only in the Linux test scripts and docs.
 
-## 2. What works on Windows (verified 2026-11-11 at c39c935, section 4)
+## 2. What works on Windows (verified 2026-11-11 at 2d1dd10, section 5.1)
 
 * **Builds:** the Kit and UI libraries, the standalone app and the
   validator, with no warnings.
 * **Validator:** fully functional.
-* **Editor:** starts and runs, but shows **nothing** for any target. The
-  store refuses to read as well as write, because `isBackendSupported` is
-  NO (#2) and that one check guards both. Every target shows "Unknown
-  (settings could not be read)", the message "this defaults backend is not
-  supported for editing yet", and Apply and Cancel greyed out. Nothing is
-  written. (This document originally predicted read-only lists; that was
-  wrong.)
+* **Editor:** reads the file backend and shows the stored values, with
+  every row read-only (unless the write opt-in in section 6 is set, which
+  is **pending winuitheme rerun**). As soon as a target opens, the message line says
+  "this defaults backend is not supported for editing yet", and nothing is
+  written. (At c39c935 it read nothing at all, because one gate guarded
+  reads and writes; section 4 records that run.)
 
 ## 3. Build recipe for winuitheme (MSYS2 CLANG64)
 
@@ -125,11 +124,9 @@ b9939d568be30d49e7641e96dd4d1a2d4c4eed49; no `make install`.
   time, and the refusal gate holds. The screenshot itself stays on the
   Windows host; it was not copied here.
 
-**Since the read-only change (section 5), reading is enabled and editing
-stays disabled.** What remains before editing on Windows:
-1. a verified Windows write path (locking, atomic replace) and its tests
-   on a Windows host;
-2. a winuitheme rerun of the read-only change (section 5).
+**Since the read-only change (section 5), reading is enabled.** Editing
+is off by default; section 6 adds an opt-in write path, **pending
+winuitheme rerun**. (The read-only change itself was rerun, section 5.1.)
 
 ## 5. Read-only on Windows (verified at 74884ee, see 5.1)
 
@@ -190,3 +187,55 @@ and HOMEPATH pointing at a temporary test home); no `make install`.
 * **App fix:** the app's "Target:" label was selectable, so it took
   keyboard focus and the theme drew a text selection on it. It is now
   non-selectable.
+* **Both fixes verified on Windows at 2d1dd10** (winuitheme #26214): `log`
+  prints "this defaults backend is not supported for editing yet" right
+  after launch, the status line shows it, and the "Target:" label is no
+  longer highlighted under WinUITheme. The build had no warnings and the
+  run had 0 failed steps.
+
+## 6. Write path, opt-in (PENDING winuitheme rerun)
+
+Nothing in this section has run on Windows yet. Until winuitheme's rerun
+passes, writes stay off unless explicitly enabled.
+
+* **Gate.** On `_WIN32` (not Cygwin), `+isBackendWritable` is YES only when
+  the file backend is readable (not `:REGISTRY:`), the defaults root is an
+  absolute path, and the environment has `GTS_ENABLE_WINDOWS_WRITES=1`
+  (exactly `1`). Otherwise it stays read-only as in section 5. The decision
+  is `+windowsWritesAllowedForRoot:environment:`, a pure function the Linux
+  tests cover case by case (`Tests/GTSWriteReadBackTests.m`).
+* **Locking and atomic replace are gnustep-base's.** The store writes the
+  same way on every platform: a fresh `NSUserDefaults` for the current
+  user, `-setPersistentDomain:forName:` and `-synchronize`, which takes
+  base's defaults lock and rewrites the domain file. The store adds no lock
+  of its own, so it cannot disagree with base or another GNUstep process.
+  Whether base's lock and file replace hold on Windows is what the rerun
+  checks.
+* **Read-back after every write (all platforms).** After `-synchronize`
+  the store re-reads the domain file with the same strict checks as a load.
+  Every changed key must hold its new value and every removed key must be
+  gone. Otherwise the commit fails with `GTSErrorWriteFailed`, "did not
+  read back as written ... state unknown, reload before retrying". On Linux
+  a stub whose `-synchronize` reports success without storing anything is
+  caught this way (write and removal).
+* **Unchanged safety:** values are validated against the theme's schema
+  before staging and must be property lists in the store; domain names
+  never contain `/`, `\`, or (on Windows) `:`; each editor writes only the
+  target it shows (NSGlobalDomain or that application's own domain);
+  conflicts since the baseline refuse the write.
+
+**Rerun checklist (winuitheme, private GNUstep home only, throwaway
+domains, never the real `%USERPROFILE%\GNUstep\Defaults`):**
+1. Without the opt-in: the startup line says "NOT writable (read-only)" and
+   section 5.1 still holds.
+2. With `GTS_ENABLE_WINDOWS_WRITES=1`: the line says "writable"; set a
+   throwaway app's theme and one setting, Apply; `defaults read` shows both;
+   the domain file is a complete plist (no `.tmp` or partial file left);
+   the `.lck` lock is gone afterwards.
+3. Remove the setting (choose the theme's default / Automatic), Apply; the
+   key is gone from `defaults read`.
+4. Conflict: change the same key with `defaults write` between staging and
+   Apply; Apply is refused with the conflict message and the file keeps the
+   outside value.
+5. Registry mode (if it can be set up in the private home): the store
+   refuses reads and writes.

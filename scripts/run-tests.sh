@@ -135,6 +135,10 @@ done
 printf 'GNUSTEP_USER_DIR=%s\nGNUSTEP_USER_DEFAULTS_DIR=%s\n' "$root/user" "$root/user/Defaults" > "$root/user.conf"
 chmod 600 "$root/GNUstep.conf" "$root/user.conf"
 export GNUSTEP_CONFIG_FILE="$root/GNUstep.conf"
+# gnustep-base ignores HOME: NSHomeDirectory() comes from GNUSTEP_HOME, else
+# the passwd entry. Pin it too, so nothing home-relative reaches ~/GNUstep.
+mkdir -p "$root/home"
+export GNUSTEP_HOME="$root/home"
 export GTS_TEST_ROOT="$root"
 export GTS_EXAMPLES="$here/examples"
 export LD_LIBRARY_PATH="${XCTEST_PREFIX:-$HOME/GNUstep}/Library/Libraries${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
@@ -156,7 +160,18 @@ case "$resolved" in
   "$root"/*) ;;
   *) fail "defaults root $resolved is not inside $root; refusing to run" ;;
 esac
-echo "run-tests: defaults root $resolved (isolated; base $plib)"
+home=$("$probe" -home) || fail "root probe (-home) failed"
+# Builds that honour GNUSTEP_HOME must land inside the root. Debian's
+# gnustep-base 1.31.1 ignores it (home stays the passwd entry); there the
+# absolute defaults and user dirs verified above are the isolation.
+case "$home" in
+  "$root"/*) ;;
+  *) if strings "$plib" 2>/dev/null | grep -qx GNUSTEP_HOME; then
+       fail "GNUstep home $home is not inside $root although this gnustep-base honours GNUSTEP_HOME; refusing to run"
+     fi
+     echo "run-tests: note: this gnustep-base ignores GNUSTEP_HOME (home $home); defaults and user dirs are absolute inside $root" ;;
+esac
+echo "run-tests: defaults root $resolved, home $home (isolated; base $plib)"
 export GTS_ROOT_PROBE="$probe"
 export GTS_VERIFIED_DEFAULTS_TOOL="$defaults_tool"
 unset GTS_DEFAULTS_TOOL

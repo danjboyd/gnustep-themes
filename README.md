@@ -68,7 +68,8 @@ scripts/validate-theme.sh path/to/MyTheme.theme     # or the .plist itself
 
 Exit status 0 means no errors (warnings are allowed), 1 means at least one
 error, and 2 means a usage or build problem. An error means an editor would
-skip the setting or reject the file, so it is safe to use in CI.
+skip the setting or reject the file, so it is safe to use in CI. A
+ready-made GitHub Actions job for theme repos is in [docs/theme-ci.md](docs/theme-ci.md).
 
 ## Building (Linux)
 
@@ -90,11 +91,14 @@ Unit tests use XCTest from
 everything CI runs:
 
 ```sh
-scripts/ci.sh            # build, 120 unit tests, schema validator
+scripts/ci.sh            # build, 128 unit tests, schema validator
 ```
 
 Tests never touch your real defaults: each run uses a scratch defaults root
-and checks that it did. `scripts/screenshots.sh` drives the real GUI on a
+and checks that it did. gnustep-base ignores `HOME`, so the runners also set
+`GNUSTEP_HOME` inside the scratch root and refuse to run if a gnustep-base
+that honours it resolves elsewhere. (Debian's 1.31.1 ignores `GNUSTEP_HOME`
+too; there every user path is set absolute in a private config instead.) `scripts/screenshots.sh` drives the real GUI on a
 private Xvfb display and is not part of CI.
 
 To install the libraries somewhere other than a real GNUstep domain, use
@@ -106,8 +110,10 @@ application.
 
 The libraries, the app and the validator build with MSYS2 CLANG64; the
 recipe and the portability audit are in [docs/windows.md](docs/windows.md).
-**Editing is disabled on Windows for now**: the editor shows settings
-read-only until the defaults store has been verified there.
+**Editing is off by default on Windows**: the editor shows settings
+read-only. An opt-in write path (`GTS_ENABLE_WINDOWS_WRITES=1`, file
+backend only, every write read back) exists but is **pending a Windows
+rerun**; see [docs/windows.md](docs/windows.md) section 6.
 
 ## Status
 

@@ -1,0 +1,43 @@
+# Copy to .github/workflows/validate-theme-settings.yml in a THEME's repo.
+# It checks the theme's ThemeSettings.plist with the gnustep-themes
+# validator: errors fail the job, warnings don't. Foundation only: it never
+# loads or builds the theme's code, and touches no defaults.
+#
+# Edit the two values marked EDIT:
+#   THEME_PATH  - the .theme bundle (or the ThemeSettings.plist) in your repo
+#   GTS_COMMIT  - a gnustep-themes commit to pin (main is fine to start)
+name: validate-theme-settings
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    container: debian:trixie
+    env:
+      THEME_PATH: MyTheme.theme                                   # EDIT
+      GTS_COMMIT: ed6b62bbb8d0a9bd76fe619a491599a8ddb9b4ff        # EDIT
+    steps:
+      - name: Install GNUstep base and make
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates git make gcc gobjc gnustep-make libgnustep-base-dev
+
+      - uses: actions/checkout@v4
+
+      - name: Fetch the validator (pinned)
+        run: |
+          git clone --filter=blob:none https://github.com/danjboyd/gnustep-themes /opt/gnustep-themes
+          git -C /opt/gnustep-themes checkout --quiet "$GTS_COMMIT"
+
+      - name: Validate ThemeSettings.plist
+        run: |
+          useradd -m ci
+          chown -R ci /opt/gnustep-themes
+          su ci -c "/opt/gnustep-themes/scripts/validate-theme.sh '$GITHUB_WORKSPACE/$THEME_PATH'"

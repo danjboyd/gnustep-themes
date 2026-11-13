@@ -134,6 +134,16 @@ void GTSRequireIsolatedDefaults(void)
     if (!GTSPathIsInside(lib, root) || !GTSPathIsInside(apps, root))
       refuse([NSString stringWithFormat: @"user Library %@ / Applications %@ not inside %@", lib, apps, root]);
   }
+  /* gnustep-base ignores HOME. Builds that honour GNUSTEP_HOME (upstream,
+     the clang toolchain) must resolve the home inside the root; Debian's
+     1.31.1 ignores GNUSTEP_HOME too, so there isolation rests on the
+     absolute defaults and user-dir paths checked above. */
+  {
+    NSString *gh = [env objectForKey: @"GNUSTEP_HOME"];
+    if ([gh length] > 0 && [NSHomeDirectory() isEqualToString: gh]
+        && !GTSPathIsInside(gh, root))
+      refuse([NSString stringWithFormat: @"GNUSTEP_HOME %@ is not inside %@", gh, root]);
+  }
 
   /* Child processes: verify read-only, with the same runtime and config,
      before the first child write. */

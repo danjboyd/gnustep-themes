@@ -32,4 +32,25 @@ if ! make -s -C "$here/Tools/ValidateSchema" >/dev/null 2>"${TMPDIR:-/tmp}/gts-v
 fi
 rm -f "${TMPDIR:-/tmp}/gts-validate-build.$$"
 
-exec "$tool" "$@"
+# The validator never needs the user's defaults, but gnustep-base opens the
+# defaults database anyway (taking its lock). Give it a throwaway private
+# one so the user's real ~/GNUstep/Defaults is never touched.
+master=$(gnustep-config --variable=GNUSTEP_CONFIG_FILE 2>/dev/null || true)
+[ -r "${master:-}" ] || master=/etc/GNUstep/GNUstep.conf
+priv=$(mktemp -d "${TMPDIR:-/tmp}/gts-validate.XXXXXX") || { echo "$0: no temp dir" >&2; exit 2; }
+trap 'rm -rf "$priv"' EXIT INT TERM
+mkdir -p "$priv/user/Defaults" "$priv/home"
+{ grep -v '^GNUSTEP_USER_CONFIG_FILE\|^GNUSTEP_USER_DEFAULTS_DIR\|^GNUSTEP_USER_DIR' "$master" 2>/dev/null || true
+  printf 'GNUSTEP_USER_CONFIG_FILE=%s/none.conf\nGNUSTEP_USER_DEFAULTS_DIR=%s/user/Defaults\nGNUSTEP_USER_DIR_LIBRARY=%s/user/Library\n' "$priv" "$priv" "$priv"
+} > "$priv/GNUstep.conf"
+# gnustep-base silently IGNORES a config file others can write and falls
+# back to the real one, so this must be owner-only.
+chmod 700 "$priv"; chmod 600 "$priv/GNUstep.conf"
+# Fail closed: refuse to run unless the private config is really in use.
+root=$(GNUSTEP_CONFIG_FILE="$priv/GNUstep.conf" gnustep-config --variable=GNUSTEP_USER_DEFAULTS_DIR 2>/dev/null || true)
+case "$root" in
+  "$priv"/*) ;;
+  *) echo "$0: could not isolate the validator's defaults (got '${root:-nothing}'); refusing to run" >&2; exit 2 ;;
+esac
+# gnustep-base ignores HOME; NSHomeDirectory() uses GNUSTEP_HOME, else passwd.
+GNUSTEP_HOME="$priv/home" GNUSTEP_CONFIG_FILE="$priv/GNUstep.conf" "$tool" "$@"

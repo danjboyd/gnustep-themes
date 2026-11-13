@@ -89,13 +89,21 @@ for k in APPS:Applications ADMIN_APPS:Applications/Admin WEB_APPS:Library/WebApp
 done
 printf 'GNUSTEP_USER_DIR=%s/user\nGNUSTEP_USER_DEFAULTS_DIR=%s/user/Defaults\n' "$root" "$root" > "$root/user.conf"
 chmod 600 "$root/GNUstep.conf" "$root/user.conf"
-export GNUSTEP_CONFIG_FILE="$root/GNUstep.conf" GTS_TEST_ROOT="$root"
+# gnustep-base ignores HOME (NSHomeDirectory() uses GNUSTEP_HOME, else passwd).
+mkdir -p "$root/home"
+export GNUSTEP_CONFIG_FILE="$root/GNUstep.conf" GTS_TEST_ROOT="$root" GNUSTEP_HOME="$root/home"
 
 make -s -C "$here/Tests/RootProbe" messages=no >/dev/null
 for d in ThemeSettingsApp ThemeSettingsDemo; do make -s -C "$here/$d" messages=no >/dev/null; done
 resolved=$("$here/Tests/RootProbe/obj/gts-root-probe")
 case "$resolved" in "$root"/*) ;; *) fail "defaults root $resolved not isolated; refusing" ;; esac
 plib=$(ldd "$here/Tests/RootProbe/obj/gts-root-probe" | awk '/libgnustep-base/{print $3}')
+# Builds that honour GNUSTEP_HOME must land inside the root (Debian's 1.31.1
+# ignores it; there the absolute defaults/user dirs above are the isolation).
+home=$("$here/Tests/RootProbe/obj/gts-root-probe" -home)
+case "$home" in "$root"/*) ;; *)
+  strings "$plib" 2>/dev/null | grep -qx GNUSTEP_HOME && fail "GNUstep home $home not isolated; refusing"
+  echo "screenshots: note: gnustep-base ignores GNUSTEP_HOME (home $home)" ;; esac
 DEFAULTS=${GTS_DEFAULTS_TOOL:-/usr/bin/defaults}
 [ "$plib" = "$(ldd "$DEFAULTS" | awk '/libgnustep-base/{print $3}')" ] || fail "defaults tool uses another gnustep-base"
 echo "screenshots: defaults root $resolved (isolated)"
@@ -133,6 +141,12 @@ done
 [ "$ready" -eq 1 ] || fail "Xvfb :$dpy not ready (lock pid ${lockpid:-none}, ours $xvfb)"
 echo "screenshots: private display :$dpy"
 export DISPLAY=":$dpy"
+# Nothing Wayland-aware (GTK helpers, the Adwaita theme's GIO) may reach the
+# real desktop or session bus: X11 on the private display only.
+case "$DISPLAY" in ""|:0|:0.*|:1|:1.*) fail "refusing DISPLAY '$DISPLAY'" ;; esac
+xdpyinfo -display "$DISPLAY" >/dev/null 2>&1 || fail "private display $DISPLAY not answering"
+unset WAYLAND_DISPLAY
+export GDK_BACKEND=x11 NO_AT_BRIDGE=1 DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent
 
 run() {   # app-binary args...
   timeout 90 "$@" >>"$root/apps.log" 2>&1 || echo "screenshots: $1 exited $?" >&2
@@ -206,6 +220,30 @@ if [ "${GTS_SHOTS_ONLY:-}" = K ]; then
   check $dn GSBackWindowShadows NO "K shadows saved"
   run "$DEMO" -GTSScreenshot "$out/K4-gumdrop-after.png"
   run "$DEMO" -GTSOpenSettings YES -GTSScript "shot $out/K5-pane-after.png"
+  grep -h "^script:" "$root/apps.log" || true
+  ls "$out"
+  [ "$checkfail" -eq 0 ] || fail "read-back checks failed"
+  exit 0
+fi
+
+# L. Gumdrop's control font, end to end. Like K, but GTS_E2E_PLIST may
+#    replace the scratch copy's ThemeSettings.plist with a draft (e.g. the
+#    nine-setting version with control/label font rows). DemoNotes' text is
+#    an NSTextView (user font), so the probe is the editor pane itself: its
+#    pop-up menus and buttons set no font and use the control font.
+if [ "${GTS_SHOTS_ONLY:-}" = L ]; then
+  themes=${GTS_E2E_THEMES:?set GTS_E2E_THEMES to a dir holding a built Gumdrop.theme}
+  [ -d "$themes/Gumdrop.theme" ] || fail "no Gumdrop.theme in $themes"
+  mkdir -p "$root/user/Library/Themes"
+  cp -R "$themes/Gumdrop.theme" "$root/user/Library/Themes/"
+  [ -z "${GTS_E2E_PLIST:-}" ] || cp "$GTS_E2E_PLIST" "$root/user/Library/Themes/Gumdrop.theme/Resources/ThemeSettings.plist"
+  dn=org.gnustep.themesettings.DemoNotes
+  D write $dn GSTheme Gumdrop
+  run "$DEMO" -GTSOpenSettings YES -GTSScript \
+    "shot $out/L1-pane-before.png; type gumdrop.control-font DejaVuSerif; type gumdrop.control-font-size 20; apply; log; shot $out/L2-pane-applied.png"
+  check $dn NSControlContentFont DejaVuSerif "L control font saved"
+  check $dn NSControlContentFontSize 20 "L control font size saved"
+  run "$DEMO" -GTSOpenSettings YES -GTSScript "shot $out/L3-pane-after-relaunch.png"
   grep -h "^script:" "$root/apps.log" || true
   ls "$out"
   [ "$checkfail" -eq 0 ] || fail "read-back checks failed"
