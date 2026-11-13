@@ -9,7 +9,9 @@ Warnings don't fail it.
    to `.github/workflows/` in the theme's repo.
 2. Set `THEME_PATH` to the `.theme` bundle (or the `ThemeSettings.plist`)
    in that repo, and `GTS_COMMIT` to the gnustep-themes commit to pin.
-3. Push. The job installs GNUstep base and make on Debian 13, fetches the
+3. Keep `actions/checkout` pinned by commit sha (the template pins v7.0.1;
+   older v4 pins run on GitHub's deprecated Node 20).
+4. Push. The job installs GNUstep base and make on Debian 13, fetches the
    pinned validator, builds it and runs `scripts/validate-theme.sh`.
 
 The validator is Foundation-only. It reads the file as a text property list
