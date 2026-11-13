@@ -42,6 +42,29 @@ say where the current choice comes from, which copy of the theme is used
 is selected but not installed. Whether a theme's code works with your GNUstep
 version is never checked here.
 
+## Follow GNOME (Adwaita)
+
+With Adwaita, a switch under the theme reads **Follow GNOME's light/dark and
+accent**. Adwaita already follows GNOME by itself whenever its **Style** and
+**Accent colour** have no value of their own. The switch is a shortcut over
+those two rows:
+
+* **On** removes both values for the current target, so Adwaita uses GNOME's
+  setting. A running application follows GNOME changes straight away, and a
+  restarted one starts with GNOME's current values.
+* **Off** stores GNOME's current values as fixed ones. For example, Dark and
+  Purple stay put even if GNOME changes later.
+
+Like any other change, it is staged until you press Apply. The note under the
+switch says what GNOME is set to. It is read when the editor opens and on
+Reload.
+
+For one application the switch only works if all applications follow GNOME
+too. If all applications have a fixed style or accent, the editor says so
+and changes nothing. Turn the switch on for all applications first.
+
+![Follow GNOME off, with GNOME's current values](screenshots/follow-gnome/N1-follow-off.png)
+
 ## Settings
 
 Below the theme come the settings the selected theme describes. A theme

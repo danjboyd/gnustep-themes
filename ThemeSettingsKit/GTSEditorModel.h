@@ -2,6 +2,7 @@
    app, in-app pane, later SystemPreferences). Foundation only, so it is
    tested headless; the AppKit view just renders it. */
 #import <Foundation/Foundation.h>
+#import "GTSGnomeSettings.h"
 
 @class GTSAppImageSidecar, GTSApplyReceipt;
 
@@ -94,6 +95,7 @@ typedef enum {
   int _binding;                 /* GTSSidecarBinding */
   GTSDomainSnapshot *_roApp;    /* AppImage app domain, read only; nil = unknown */
   GTSApplyOutcome *_lastOutcome;
+  GTSGnomeSettings *_gnome;      /* nil = +[GTSGnomeSettings systemSettings] */
 }
 - (id) initWithStore: (GTSDefaultsDomainStore*)store catalog: (GTSThemeCatalog*)catalog;
 
@@ -155,4 +157,18 @@ typedef enum {
 - (void) cancel;
 - (BOOL) reload;         /* pick up external edits, keep staged changes */
 - (NSString*) message;   /* last error/conflict/restart text, or nil */
+
+/* "Follow GNOME's light/dark and accent" (Adwaita only). Adwaita follows
+   GNOME by itself when GnomeThemeColorScheme and GnomeThemeAccentColor are
+   unset, so the switch is a shortcut over those two rows:
+     on  = stage a reset of both for this target;
+     off = stage GNOME's current values as fixed ones.
+   -followsSystem is YES when neither is set for this target nor (for an
+   application) for all applications. Nothing is written until Apply. */
+- (BOOL) offersFollowSystem;
+- (NSString*) followSystemTitle;
+- (BOOL) followsSystem;
+- (NSString*) followSystemNote;
+- (BOOL) setFollowsSystem: (BOOL)follow;   /* NO: see -message */
+- (void) setGnomeSettings: (GTSGnomeSettings*)gnome;   /* tests */
 @end

@@ -14,6 +14,7 @@
 #   =I only the installed-library smoke: Kit/UI staged into a prefix inside
 #      the scratch root (make install DESTDIR=...), Tests/ExternalHost built
 #      out of tree against it, link/runtime receipts, one Apply on Xvfb.
+#   =O whether the REAL Adwaita theme follows GNOME by itself (GTS_E2E_THEMES).
 #   =J end to end with the REAL Adwaita theme: GTS_E2E_THEMES=<dir holding a
 #      built Adwaita.theme>, copied into the isolated user's Library/Themes;
 #      the demo app is captured before and after changing settings in its
@@ -147,6 +148,9 @@ case "$DISPLAY" in ""|:0|:0.*|:1|:1.*) fail "refusing DISPLAY '$DISPLAY'" ;; esa
 xdpyinfo -display "$DISPLAY" >/dev/null 2>&1 || fail "private display $DISPLAY not answering"
 unset WAYLAND_DISPLAY
 export GDK_BACKEND=x11 NO_AT_BRIDGE=1 DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent
+# GNOME settings (read by "Follow GNOME" and by Adwaita) come from a private
+# keyfile in the scratch root, never the real dconf database.
+export GSETTINGS_BACKEND=keyfile XDG_CONFIG_HOME="$root/xdg"
 
 run() {   # app-binary args...
   timeout 90 "$@" >>"$root/apps.log" 2>&1 || echo "screenshots: $1 exited $?" >&2
@@ -192,6 +196,44 @@ if [ "${GTS_SHOTS_ONLY:-}" = J ]; then
     "choose adwaita.menu-style menubar; shot $out/J5-pane-after-dark-red.png; cancel"
   check $dn GnomeThemeMenuStyle "" "J throwaway menu-style change was cancelled, never saved"
   grep -h "^script:" "$root/apps.log" || true
+  ls "$out"
+  [ "$checkfail" -eq 0 ] || fail "read-back checks failed"
+  exit 0
+fi
+
+# O. Does the REAL Adwaita theme follow GNOME by itself (nothing stored)?
+#    GTS_E2E_THEMES holds a built Adwaita.theme. GNOME's values come from the
+#    private keyfile (GSETTINGS_BACKEND=keyfile, XDG_CONFIG_HOME in the
+#    scratch root). Live: GNOME goes light/blue -> dark/purple while DemoNotes
+#    is open. Restart: relaunch picks up the new values. Pinned: "Follow
+#    GNOME" turned off in the pane stores GNOME's values; a later GNOME
+#    change no longer applies.
+if [ "${GTS_SHOTS_ONLY:-}" = O ]; then
+  themes=${GTS_E2E_THEMES:?set GTS_E2E_THEMES to a dir holding a built Adwaita.theme}
+  [ -d "$themes/Adwaita.theme" ] || fail "no Adwaita.theme in $themes"
+  command -v gsettings >/dev/null 2>&1 || fail "no gsettings"
+  mkdir -p "$root/user/Library/Themes"
+  cp -R "$themes/Adwaita.theme" "$root/user/Library/Themes/"
+  G() { gsettings set org.gnome.desktop.interface "$@"; }
+  dn=org.gnustep.themesettings.DemoNotes
+  D write $dn GSTheme Adwaita
+  D delete NSGlobalDomain GnomeThemeColorScheme 2>/dev/null || true
+  G color-scheme default; G accent-color blue
+  ( sleep 4; G color-scheme prefer-dark; G accent-color purple ) &
+  flip=$!
+  run "$DEMO" -GTSOpenSettings YES -GTSScript \
+    "choose adwaita.menu-style menubar; shot $out/O1-follow-before-light-blue.png; wait 7; shot $out/O2-follow-live-after-gnome-dark-purple.png; cancel"
+  wait $flip
+  run "$DEMO" -GTSOpenSettings YES -GTSScript \
+    "choose adwaita.menu-style menubar; shot $out/O3-follow-relaunch-dark-purple.png; cancel; follow off; apply; log"
+  check $dn GnomeThemeColorScheme force-dark "O follow off pinned GNOME's style"
+  check $dn GnomeThemeAccentColor purple "O follow off pinned GNOME's accent"
+  G color-scheme default; G accent-color green
+  run "$DEMO" -GTSOpenSettings YES -GTSScript \
+    "choose adwaita.menu-style menubar; shot $out/O4-pinned-ignores-gnome-light-green.png; cancel"
+  check $dn GnomeThemeMenuStyle "" "O throwaway menu-style change was cancelled, never saved"
+  grep -h "^script:" "$root/apps.log" || true
+  grep -i "gsettings\|memory.*backend\|GLib" "$root/apps.log" | head -5 || true
   ls "$out"
   [ "$checkfail" -eq 0 ] || fail "read-back checks failed"
   exit 0
@@ -388,6 +430,31 @@ run "$APP" $X -GTSTargetApp "$root/apps/Locked.app" -GTSScript \
 chmod 600 "$root/user/Defaults/org.example.Locked.plist"
 after=$(sha256sum "$root/user/Defaults/org.example.Locked.plist" | cut -d' ' -f1)
 [ "$before" = "$after" ] && echo "CHECK ok: E unreadable domain file unchanged" || { echo "CHECK FAILED: E file changed"; checkfail=1; }
+
+# N. "Follow GNOME's light/dark and accent" (Adwaita). GNOME's values come
+#    from the private keyfile above. Global target: turning it on removes the
+#    fixed values; turning it off pins GNOME's current ones. An application
+#    can't follow while all applications pin a value (refused, nothing saved).
+if command -v gsettings >/dev/null 2>&1; then
+  G() { gsettings set org.gnome.desktop.interface "$@"; }
+  G color-scheme prefer-dark; G accent-color teal
+  D write NSGlobalDomain GSTheme Adwaita
+  run "$APP" $X -GTSScript "shot $out/N1-follow-off.png; follow on; shot $out/N2-follow-on-staged.png; apply; log"
+  check NSGlobalDomain GnomeThemeColorScheme "" "N follow on removed the fixed style"
+  check NSGlobalDomain GnomeThemeAccentColor "" "N follow on left no accent"
+  G color-scheme prefer-light; G accent-color orange
+  run "$APP" $X -GTSScript "shot $out/N3-follow-on-gnome-changed.png; follow off; apply; log"
+  check NSGlobalDomain GnomeThemeColorScheme force-light "N follow off pinned GNOME's style"
+  check NSGlobalDomain GnomeThemeAccentColor orange "N follow off pinned GNOME's accent"
+  run "$DEMO" $X -GTSOpenSettings YES -GTSScript "follow on; log; shot $out/N4-app-follow-refused.png"
+  check org.gnustep.themesettings.DemoNotes GnomeThemeColorScheme "" "N app follow refused while global pins"
+  grep -q 'script: follow on -> FAILED' "$root/apps.log" && echo "CHECK ok: N app-level follow refused" \
+    || { echo "CHECK FAILED: N app-level follow not refused"; checkfail=1; }
+  [ -f "$root/xdg/glib-2.0/settings/keyfile" ] && echo "CHECK ok: N GNOME values came from the private keyfile" \
+    || { echo "CHECK FAILED: N no private keyfile"; checkfail=1; }
+else
+  echo "screenshots: no gsettings; scenario N skipped"
+fi
 
 grep -h "^script:\|screenshot" "$root/apps.log" || true
 ls "$out"

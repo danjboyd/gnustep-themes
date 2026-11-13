@@ -119,3 +119,49 @@ fun-themes' proof commit cdb9c9d:
 [5fd5fa6](https://github.com/danjboyd/gnustep-funthemes/blob/5fd5fa64802a0325d713a4ec3201b437a4b4a5cd/Themes/Gumdrop/ThemeSettings.plist),
 which `examples/Gumdrop.theme` now mirrors byte for byte.
 
+
+## Adwaita follows GNOME by itself (scenario O), plugins-themes-Adwaita 510fa53, 2026-11-13
+
+This checks whether the **Follow GNOME** switch needs a helper that copies
+GNOME's settings into GNUstep defaults. It doesn't, at least on a normal
+install.
+
+The run was on a private Xvfb with a scratch GNUstep home. GNOME's settings
+came from a private GSettings keyfile (`GSETTINGS_BACKEND=keyfile`,
+`XDG_CONFIG_HOME` in the scratch root), never the real dconf database.
+DemoNotes used the built Adwaita theme, with no colour scheme or accent
+stored.
+
+| Step | Result |
+|---|---|
+| Start: GNOME light, blue | light, blue (O1) |
+| GNOME changed to dark, purple while DemoNotes was open | dark, purple **in the running app** (O2). Adwaita watches GNOME's settings through GIO. |
+| Relaunch | dark, purple (O3) |
+| Switch turned off in the pane, Apply | `force-dark` and `purple` stored (checked by read-back) |
+| GNOME changed to light, green; relaunch | still dark, purple (O4): the stored values win |
+
+| Before (O1) | GNOME changed, app still open (O2) |
+|---|---|
+| ![](screenshots/follow-gnome/O1-follow-before-light-blue.png) | ![](screenshots/follow-gnome/O2-follow-live-after-gnome-dark-purple.png) |
+
+| Relaunched (O3) | Pinned, GNOME changed again (O4) |
+|---|---|
+| ![](screenshots/follow-gnome/O3-follow-relaunch-dark-purple.png) | ![](screenshots/follow-gnome/O4-pinned-ignores-gnome-light-green.png) |
+
+In O2 the note under the switch still says "GNOME now: Light, Blue". It was
+read when the pane opened, and Reload refreshes it.
+
+**Possible gap, not tested.** Adwaita reads GNOME through GIO. An AppImage
+that bundles Adwaita would also need GIO's dconf module and GNOME's schemas
+to reach the host's settings. Without them, GLib falls back to its in-memory
+settings, and the app would stay light and blue. No such AppImage exists yet:
+the Theme Settings AppImage bundles neither Adwaita nor GIO. Check this when
+one is built.
+
+To run it: build Adwaita with the clang toolchain, then:
+
+```sh
+GTS_MASTER_CONF=<toolchain>/etc/GNUstep/GNUstep.conf \
+GTS_DEFAULTS_TOOL=<toolchain>/Local/Tools/defaults \
+GTS_E2E_THEMES=<dir with the built Adwaita.theme> GTS_SHOTS_ONLY=O scripts/screenshots.sh <out>
+```

@@ -40,6 +40,15 @@
     }
   step = [[[_steps objectAtIndex: 0] retain] autorelease];
   [_steps removeObjectAtIndex: 0];
+  if ([step hasPrefix: @"wait "])
+    {
+      /* Let something outside the app happen (tests change GNOME's
+         settings meanwhile); the next step runs after that many seconds. */
+      double secs = [[step substringFromIndex: 5] doubleValue];
+      fprintf(stderr, "script: %s -> ok\n", [step UTF8String]);
+      [self performSelector: @selector(next) withObject: nil afterDelay: secs > 0 ? secs : 0.4];
+      return;
+    }
   if ([step hasPrefix: @"shot "])
     ok = GTSWriteWindowPNG(_window, [step substringFromIndex: 5]);
   else if ([step isEqual: @"log"])
