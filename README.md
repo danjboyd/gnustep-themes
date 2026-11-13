@@ -25,7 +25,7 @@ applications or for one application, without editing defaults by hand.
 | `ThemeSettingsDemo/` | An example app that embeds the editor as its own preferences pane. |
 | `Tools/ValidateSchema/` | `gts-validate-schema`, a checker for theme authors and CI. |
 | `examples/` | `ThemeSettings.plist` for Adwaita, WinUITheme and Gumdrop (mirrors of, or drafts for, the theme owners' files). |
-| `docs/` | [User guide](docs/user-guide.md), [end-to-end checks with real themes](docs/end-to-end.md), schema spec, embedding guide, platform notes, Windows audit. |
+| `docs/` | [User guide](docs/user-guide.md), [end-to-end checks with real themes](docs/end-to-end.md), schema spec, embedding guide, platform notes, Windows audit, [first-release checklist (draft)](docs/release-checklist.md). |
 
 ## For theme authors
 
@@ -91,7 +91,7 @@ Unit tests use XCTest from
 everything CI runs:
 
 ```sh
-scripts/ci.sh            # build, 128 unit tests, schema validator
+scripts/ci.sh            # build, 129 unit tests, new-user check, schema validator
 ```
 
 Tests never touch your real defaults: each run uses a scratch defaults root

@@ -26,6 +26,17 @@ How it finds and stores things:
   launcher always uses the bundled `GNUstep.conf`, so to point it at another
   home (for a test) set `GNUSTEP_HOME`, not `GNUSTEP_CONFIG_FILE`.
 
+## Trying it safely
+
+`packaging/try-isolated.sh path/to/ThemeSettings-*.AppImage` runs the AppImage
+with a throwaway GNUstep home, refuses to start unless the AppImage's own
+`defaults` tool reads that home, and checks that your real defaults folder is
+unchanged afterwards. See the user guide, "Install and run the AppImage".
+Tested 2026-11-13 on a private display with a fake "real" home: a normal run
+(Apply wrote only into the throwaway home); a control with the isolation
+removed, which refused to start (exit 2); and a control that changed a real
+file mid-run, which was reported (exit 3).
+
 ## Test run (2026-11-13, package-appimage run 43507118802 at 7b71cc0)
 
 `packaging/test-appimage.sh` runs a built AppImage on a private Xvfb display
