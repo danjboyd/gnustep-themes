@@ -23,6 +23,30 @@
 }
 @end
 
+/* NSUserDefaults whose FIRST -synchronize reports NO, as gnustep-base does
+   when it has just created a missing defaults directory (new user). */
+@interface GTSFirstSyncFailsDefaults : NSUserDefaults
+{
+  BOOL synced;
+}
+@end
+@implementation GTSFirstSyncFailsDefaults
+- (BOOL) synchronize
+{
+  if (!synced) { synced = YES; [super synchronize]; return NO; }
+  return [super synchronize];
+}
+@end
+
+@interface GTSFirstSyncFailsStore : GTSDefaultsDomainStore
+@end
+@implementation GTSFirstSyncFailsStore
+- (NSUserDefaults*) newDefaultsInstance
+{
+  return [[GTSFirstSyncFailsDefaults alloc] initWithUser: NSUserName()];
+}
+@end
+
 @interface GTSWriteReadBackTests : XCTestCase
 {
   NSString *app;
@@ -86,6 +110,17 @@
   XCTAssertTrue([[err localizedDescription] rangeOfString: @"did not read back"].length > 0, @"%@", err);
   XCTAssertNil([[[[[GTSDefaultsDomainStore alloc] init] autorelease]
     snapshotForDomain: app error: NULL] objectForKey: @"GumdropSize"], @"nothing was stored");
+}
+
+- (void) testSynchronizeFailureWithExistingRootStillRefuses
+{
+  /* The one-retry rule covers only a defaults root that did not exist yet
+     (scripts/fresh-root-check.sh tests that with the real gnustep-base).
+     With an existing root, a failed -synchronize still refuses. */
+  GTSFirstSyncFailsStore *s = [[[GTSFirstSyncFailsStore alloc] init] autorelease];
+  NSError *err = nil;
+  XCTAssertNil([s snapshotForDomain: app error: &err]);
+  XCTAssertEqual([err code], (NSInteger)GTSErrorUnreadableDomain);
 }
 
 - (void) testSilentNoOpRemovalIsReportedAsFailed
