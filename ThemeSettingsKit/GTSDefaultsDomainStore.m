@@ -395,6 +395,7 @@ classifyPath(NSString *path, NSString **why)
   NSUserDefaults *d;
   NSDictionary *apiValues, *fileValues = nil;
   GTSDomainSnapshot *snap;
+  BOOL rootWasAbsent;
 
   if (outDefaults) *outDefaults = nil;
   if (![[self class] isValidDomainName: domainName])
@@ -404,8 +405,18 @@ classifyPath(NSString *path, NSString **why)
     }
   if (![self checkBackendForDomain: domainName fileValues: &fileValues error: error])
     return nil;
+  /* gnustep-base's first -synchronize when the defaults directory does not
+     exist yet (a new user, no ~/GNUstep/Defaults) reports NO; the next one
+     succeeds (seen with Debian's 1.31.1 and the clang toolchain's base).
+     Retry once, and only in that case; any other failure still refuses. */
+  rootWasAbsent = (classifyPath([[self class] defaultsRoot], NULL) == GTSPathAbsent);
   d = [self newDefaultsInstance];
-  if (d == nil || ![d synchronize])
+  if (d != nil && ![d synchronize] && !(rootWasAbsent && [d synchronize]))
+    {
+      [d release];
+      d = nil;
+    }
+  if (d == nil)
     {
       [d release];
       if (error) *error = storeError(GTSErrorUnreadableDomain,

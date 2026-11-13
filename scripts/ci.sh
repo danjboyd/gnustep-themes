@@ -70,6 +70,10 @@ echo "unit tests passed: $total; failure lines: $failed"
 [ -z "${GTS_CI_MIN_TESTS:-}" ] || [ "$total" -ge "$GTS_CI_MIN_TESTS" ] || fail "only $total tests ran (expected >= $GTS_CI_MIN_TESTS)"
 done_step
 
+step "New user (no defaults directory yet)"
+"$here/scripts/fresh-root-check.sh" || fail "store failed in a new user's defaults root"
+done_step
+
 step "Schema validator"
 "$here/scripts/validate-theme.sh" "$here"/examples/*.theme "$here/Tests/Fixtures/Schema/good.plist"
 if "$here/scripts/validate-theme.sh" -q "$here"/Tests/Fixtures/Schema/bad-*.plist >/dev/null; then
