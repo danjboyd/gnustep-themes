@@ -32,6 +32,24 @@ Set the same version in all four places, in one commit on main:
 | Theme files | `scripts/validate-theme.sh` on every `examples/*.theme`, plus the owners' own files (Adwaita CI already runs it) | 0 errors |
 | Windows | winuitheme's run of `docs/windows.md` section 6 (after its 11/15 reset) | report id |
 
+### Dry run at main `6ea3cb2` (2026-11-13; not the tag commit)
+
+This records where each check stands today. All of them run again at the
+commit that is actually tagged.
+
+| Check | Result |
+|---|---|
+| Linux CI | GitHub CI run 43513221578: success |
+| Local CI | `scripts/ci.sh`: all steps passed, 129 tests, 0 failures |
+| GUI scenarios | `scripts/screenshots.sh`: 7 of 7 CHECK lines ok (B, C, D, E, F) |
+| AppImage build | last build at `7b71cc0` (run 43507118802, sha256 77478d41…; the download expires 2026-11-20). Same app code as `6ea3cb2`; the commits since then change only docs, scripts and examples. **A release build at the tag commit needs Dan's go.** |
+| AppImage test | `packaging/test-appimage.sh` passed on that build: new home OK, host theme roots OK with control, Apply saved into the scratch home ([packaging/README.md](../packaging/README.md)) |
+| Try-safely launcher | passed on that build (2026-11-13): normal run 0, isolation-removed control 2, tamper control 3 |
+| Theme files | Adwaita, Gumdrop, WinUITheme examples and `good.plist`: 0 errors, 0 warnings; the bad fixtures are rejected |
+| Windows | waiting for winuitheme's run (after its 11/15 reset) |
+
+Release notes: drafted in [release-notes-0.1.0.md](release-notes-0.1.0.md).
+
 **Windows decision (open):** either
 (a) the Windows test passes, and writes become the default on Windows in a
 separate tested push before the tag; or
@@ -39,7 +57,7 @@ separate tested push before the tag; or
 marked experimental. The release notes then say so.
 Dan decides which.
 
-## 3. Release notes (to draft at release time)
+## 3. Release notes (draft: [release-notes-0.1.0.md](release-notes-0.1.0.md))
 
 - What it is: one editor for theme settings, standalone and embeddable,
   writing the GNUstep defaults keys the theme already reads.
