@@ -77,9 +77,11 @@
   NSString *root = @"/c/Users/agent/GNUstep/Defaults";
 
   XCTAssertTrue([S windowsWritesAllowedForRoot: root environment: on]);
-  XCTAssertFalse([S windowsWritesAllowedForRoot: root environment: none], @"opt-in required");
-  XCTAssertFalse([S windowsWritesAllowedForRoot: root environment: zero]);
-  XCTAssertFalse([S windowsWritesAllowedForRoot: root environment: yes], @"only exactly 1");
+  XCTAssertTrue([S windowsWritesAllowedForRoot: root environment: none], @"on by default");
+  XCTAssertFalse([S windowsWritesAllowedForRoot: root environment: zero], @"0 turns writes off");
+  XCTAssertTrue([S windowsWritesAllowedForRoot: root environment: yes], @"only exactly 0 turns off");
+  XCTAssertFalse([S windowsWritesAllowedForRoot: @":REGISTRY:" environment: none], @"registry never, even by default");
+  XCTAssertFalse([S windowsWritesAllowedForRoot: @"GNUstep/Defaults" environment: none], @"relative root, even by default");
   XCTAssertFalse([S windowsWritesAllowedForRoot: @":REGISTRY:" environment: on], @"registry never");
   XCTAssertFalse([S windowsWritesAllowedForRoot: @"GNUstep/Defaults" environment: on], @"relative root");
   XCTAssertFalse([S windowsWritesAllowedForRoot: nil environment: on]);

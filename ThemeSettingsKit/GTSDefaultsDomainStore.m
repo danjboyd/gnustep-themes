@@ -181,7 +181,7 @@ static int gWritableOverride = -1;
   /* GNUstep's file backend keeps one plist per domain, as on POSIX
      (winuitheme, docs/windows.md section 4). A GNUSTEP_USER_DEFAULTS_DIR
      of ":REGISTRY:" selects the registry instead, which this store
-     cannot read. PENDING winuitheme rerun. */
+     cannot read. */
   return [[self defaultsRoot] rangeOfString: @":REGISTRY:"].length == 0;
 #elif defined(__CYGWIN__)
   return NO;
@@ -193,11 +193,12 @@ static int gWritableOverride = -1;
 + (BOOL) windowsWritesAllowedForRoot: (NSString*)root environment: (NSDictionary*)env
 {
   /* Locking and the atomic file replace are gnustep-base's own (the same
-     -synchronize as on POSIX); the store adds the read-back check. Opt-in
-     until winuitheme's rerun verifies base's behaviour on Windows. */
+     -synchronize as on POSIX); the store adds the read-back check.
+     Verified on Windows (docs/windows.md 6.1). GTS_ENABLE_WINDOWS_WRITES=0
+     turns writes off again. */
   return [root isKindOfClass: [NSString class]] && [root isAbsolutePath]
     && [root rangeOfString: @":REGISTRY:"].length == 0
-    && [[env objectForKey: @"GTS_ENABLE_WINDOWS_WRITES"] isEqual: @"1"];
+    && ![[env objectForKey: @"GTS_ENABLE_WINDOWS_WRITES"] isEqual: @"0"];
 }
 
 + (BOOL) isBackendWritable
@@ -243,7 +244,7 @@ typedef enum { GTSPathAbsent, GTSPathFile, GTSPathDirectory, GTSPathError } GTSP
 /* NSFileManager-based classification (no lstat/S_ISLNK on MinGW, and
    UCRT _access rejects X_OK). Same policy as POSIX: only "does not exist"
    counts as absent; a link whose target is missing, or an unexpected file
-   type, is an error. PENDING winuitheme rerun. */
+   type, is an error. Exercised on Windows 2026-11-15 (docs/windows.md 6.1). */
 static GTSPathKind
 classifyPath(NSString *path, NSString **why)
 {

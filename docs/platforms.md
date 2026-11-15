@@ -10,7 +10,7 @@ Nothing in this document enables editing anywhere it is not already enabled.
 | Capability | Linux (Debian, base 1.31.1) | Windows (MSYS2) | macOS |
 |---|---|---|---|
 | Exact-domain read (fresh `NSUserDefaults` instance + file-backend preflight) | Tested (unit + two-process) | Works, read-only (verified at 2d1dd10, windows.md section 5) | UNTESTED; see note below |
-| Exact-domain write (per-key merge, optimistic conflict check) | Tested; same-key race documented | Off by default (read-only). Opt-in with `GTS_ENABLE_WINDOWS_WRITES=1`, file backend only, read-back after every write: tested on Windows 11 2026-11-15 (save, remove, conflict; windows.md 6.1) | UNTESTED |
+| Exact-domain write (per-key merge, optimistic conflict check) | Tested; same-key race documented | On for the file backend (registry refused; `GTS_ENABLE_WINDOWS_WRITES=0` turns it off), read-back after every write: tested on Windows 11 2026-11-15 (save, remove, conflict; windows.md 6.1) | UNTESTED |
 | Fail-closed on unreadable/corrupt domain | Tested (mode 000, truncated plist, dir 000, dangling link, EACCES ancestor) | Same checks via `NSFileManager`; **pending winuitheme rerun** | UNTESTED |
 | Defaults-store identity (`GSDefaultsRootForUser`) | Tested; isolation via `GNUSTEP_CONFIG_FILE` only (env `GNUSTEP_USER_CONFIG_FILE` ignored) | Files under `%USERPROFILE%\GNUstep\Defaults`, not the registry (verified, windows.md section 4); the startup diagnostics line names the root | UNTESTED |
 | Theme discovery (search order user > local > network > system; shadowing) | Tested (synthetic roots) | UNTESTED (path layout differs) | UNTESTED |

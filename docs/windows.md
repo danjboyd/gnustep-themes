@@ -197,13 +197,14 @@ and HOMEPATH pointing at a temporary test home); no `make install`.
 ## 6. Write path, opt-in (verified at 66e691e, see 6.1)
 
 Steps 1-4 of the checklist below passed on Windows on 2026-11-15 (6.1).
-Writes are still off unless explicitly enabled; whether 0.1.0 turns them on
-by default is Dan's decision (docs/release-checklist.md).
+Writes are now on by default for the file backend (Dan's choice (a) for
+0.1.0); `GTS_ENABLE_WINDOWS_WRITES=0` turns them off.
 
 * **Gate.** On `_WIN32` (not Cygwin), `+isBackendWritable` is YES only when
   the file backend is readable (not `:REGISTRY:`), the defaults root is an
-  absolute path, and the environment has `GTS_ENABLE_WINDOWS_WRITES=1`
-  (exactly `1`). Otherwise it stays read-only as in section 5. The decision
+  absolute path, and the environment does not set
+  `GTS_ENABLE_WINDOWS_WRITES=0` (exactly `0`). Otherwise it stays read-only
+  as in section 5. (Until this change writes needed `=1`; 6.1 ran that way.) The decision
   is `+windowsWritesAllowedForRoot:environment:`, a pure function the Linux
   tests cover case by case (`Tests/GTSWriteReadBackTests.m`).
 * **Locking and atomic replace are gnustep-base's.** The store writes the

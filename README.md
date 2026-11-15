@@ -91,7 +91,7 @@ Unit tests use XCTest from
 everything CI runs:
 
 ```sh
-scripts/ci.sh            # build, 129 unit tests, new-user check, schema validator
+scripts/ci.sh            # build, 137 unit tests, new-user check, schema validator
 ```
 
 Tests never touch your real defaults: each run uses a scratch defaults root
@@ -110,10 +110,10 @@ application.
 
 The libraries, the app and the validator build with MSYS2 CLANG64; the
 recipe and the portability audit are in [docs/windows.md](docs/windows.md).
-**Editing is off by default on Windows**: the editor shows settings
-read-only. An opt-in write path (`GTS_ENABLE_WINDOWS_WRITES=1`, file
-backend only, every write read back) passed winuitheme's Windows 11 test
-on 2026-11-15 (save, remove, conflict check); see
+**Editing works on Windows** with GNUstep's file defaults backend (every
+write read back), tested by winuitheme on Windows 11 on 2026-11-15 (save,
+remove, conflict check). A registry-backed configuration is refused, and
+`GTS_ENABLE_WINDOWS_WRITES=0` turns editing off; see
 [docs/windows.md](docs/windows.md) section 6.1.
 
 ## Status

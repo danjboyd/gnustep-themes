@@ -1,8 +1,8 @@
 # Theme Settings 0.1.0: release notes (DRAFT)
 
 Status: **draft, not released.** No tag exists. Dan approves the release;
-see [release-checklist.md](release-checklist.md). The Windows paragraph is
-left open until his choice there.
+see [release-checklist.md](release-checklist.md). This version of the notes
+assumes his Windows choice (a), editing on by default.
 
 ## What it is
 
@@ -48,17 +48,14 @@ It comes in two forms that share the same editor:
 ## Platforms
 
 - **Linux:** tested. CI runs on Debian 13 as an unprivileged user: build,
-  129 unit tests, a new-user check and the schema validator. The GUI is also
+  137 unit tests, a new-user check and the schema validator. The GUI is also
   tested on a private display.
 - **Windows:** built and tested on Windows 11 (MSYS2 CLANG64) on
   2026-11-15: reading, saving, removing and the conflict check all passed
-  ([windows.md](windows.md) 6.1). *The default is to be filled in once Dan
-  has chosen:*
-  - (a) "Editing works on Windows (registry-backed defaults are not
-    supported)"; or
-  - (b) "Read-only by default. Editing can be turned on with
-    `GTS_ENABLE_WINDOWS_WRITES=1` and is experimental"
-  ([windows.md](windows.md)).
+  ([windows.md](windows.md) 6.1). Editing works with GNUstep's file
+  defaults backend; a registry-backed configuration is shown read-only.
+  `GTS_ENABLE_WINDOWS_WRITES=0` turns editing off. No Windows package is
+  provided: build from source with the recipe in windows.md.
 - **macOS:** untested ([platforms.md](platforms.md)).
 
 ## Known issues

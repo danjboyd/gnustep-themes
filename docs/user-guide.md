@@ -120,9 +120,10 @@ at the bottom says why:
 
   ![Unreadable settings](screenshots/E-unreadable-refused.png)
 
-* **Windows (for now)**: settings are shown, read-only, with "this defaults
-  backend is not supported for editing yet". Editing can be turned on with
-  `GTS_ENABLE_WINDOWS_WRITES=1` ([windows.md](windows.md) section 6).
+* **Windows with registry-backed defaults**, or with
+  `GTS_ENABLE_WINDOWS_WRITES=0` set: settings are shown, read-only, with
+  "this defaults backend is not supported for editing yet"
+  ([windows.md](windows.md) section 6).
 * **A theme asks for something this version doesn't understand**: its rows
   are shown read-only, with a note.
 

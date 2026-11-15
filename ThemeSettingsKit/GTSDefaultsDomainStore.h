@@ -91,18 +91,19 @@ typedef enum {
 /* Absolute directory where this process reads/writes defaults. */
 + (NSString*) defaultsRoot;
 /* Reads: GNUstep's file-based defaults backend, on POSIX and on Windows
-   (one plist per domain in both; Windows PENDING a rerun there). A
+   (one plist per domain in both; verified on Windows 2026-11-15). A
    registry-backed Windows configuration is not readable. When NO, every
    read and write fails with GTSErrorUnsupportedBackend. */
 + (BOOL) isBackendReadable;
 /* Writes: the POSIX file backend; on Windows (MinGW, not Cygwin) the file
-   backend only when GTS_ENABLE_WINDOWS_WRITES=1 is set (opt-in, PENDING a
-   winuitheme rerun). Elsewhere commits fail with GTSErrorUnsupportedBackend
+   backend unless GTS_ENABLE_WINDOWS_WRITES=0 is set (verified on Windows
+   2026-11-15, docs/windows.md 6.1). Elsewhere commits fail with GTSErrorUnsupportedBackend
    ("not supported for editing yet") and editors show values read-only.
    Every write is read back from the domain file and must match. */
 + (BOOL) isBackendWritable;
 /* The Windows write gate as a pure function, so it can be tested anywhere:
-   YES only for an absolute, non-registry root with the opt-in set to "1". */
+   YES for an absolute, non-registry root unless the environment has
+   GTS_ENABLE_WINDOWS_WRITES set to exactly "0". */
 + (BOOL) windowsWritesAllowedForRoot: (NSString*)root environment: (NSDictionary*)env;
 /* Same as +isBackendWritable (kept for existing callers). */
 + (BOOL) isBackendSupported;
