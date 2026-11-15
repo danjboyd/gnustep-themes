@@ -50,7 +50,10 @@ It comes in two forms that share the same editor:
 - **Linux:** tested. CI runs on Debian 13 as an unprivileged user: build,
   129 unit tests, a new-user check and the schema validator. The GUI is also
   tested on a private display.
-- **Windows:** *to be filled in once Dan has chosen:*
+- **Windows:** built and tested on Windows 11 (MSYS2 CLANG64) on
+  2026-11-15: reading, saving, removing and the conflict check all passed
+  ([windows.md](windows.md) 6.1). *The default is to be filled in once Dan
+  has chosen:*
   - (a) "Editing works on Windows (registry-backed defaults are not
     supported)"; or
   - (b) "Read-only by default. Editing can be turned on with

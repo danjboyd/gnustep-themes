@@ -2,7 +2,8 @@
 
 Status: audited 2026-11-10; **first Windows build 2026-11-11** by winuitheme
 at b9939d5 (see section 4). Statements still marked UNTESTED were not covered
-by that run. Line numbers are valid at the commit that adds this document
+by that run. **Write path verified 2026-11-15** at 66e691e with the opt-in
+(section 6.1). Line numbers are valid at the commit that adds this document
 unless noted. See also docs/platforms.md.
 
 ## 1. Audit (Kit, UI library, standalone app, validator)
@@ -34,8 +35,8 @@ exist in the Kit, the UI library, the app or the validator. `.so` and
   validator, with no warnings.
 * **Validator:** fully functional.
 * **Editor:** reads the file backend and shows the stored values, with
-  every row read-only (unless the write opt-in in section 6 is set, which
-  is **pending winuitheme rerun**). As soon as a target opens, the message line says
+  every row read-only, unless the write opt-in in section 6 is set
+  (verified on Windows 2026-11-15, section 6.1). As soon as a target opens, the message line says
   "this defaults backend is not supported for editing yet", and nothing is
   written. (At c39c935 it read nothing at all, because one gate guarded
   reads and writes; section 4 records that run.)
@@ -193,10 +194,11 @@ and HOMEPATH pointing at a temporary test home); no `make install`.
   longer highlighted under WinUITheme. The build had no warnings and the
   run had 0 failed steps.
 
-## 6. Write path, opt-in (PENDING winuitheme rerun)
+## 6. Write path, opt-in (verified at 66e691e, see 6.1)
 
-Nothing in this section has run on Windows yet. Until winuitheme's rerun
-passes, writes stay off unless explicitly enabled.
+Steps 1-4 of the checklist below passed on Windows on 2026-11-15 (6.1).
+Writes are still off unless explicitly enabled; whether 0.1.0 turns them on
+by default is Dan's decision (docs/release-checklist.md).
 
 * **Gate.** On `_WIN32` (not Cygwin), `+isBackendWritable` is YES only when
   the file backend is readable (not `:REGISTRY:`), the defaults root is an
@@ -231,7 +233,8 @@ domains, never the real `%USERPROFILE%\GNUstep\Defaults`):**
 2. With `GTS_ENABLE_WINDOWS_WRITES=1`: the line says "writable"; set a
    throwaway app's theme and one setting, Apply; `defaults read` shows both;
    the domain file is a complete plist (no `.tmp` or partial file left);
-   the `.lck` lock is gone afterwards.
+   the `.lck` directory is empty afterwards. (`.lck` is a permanent
+   directory in gnustep-base; the lock is created and removed inside it.)
 3. Remove the setting (choose the theme's default / Automatic), Apply; the
    key is gone from `defaults read`.
 4. Conflict: change the same key with `defaults write` between staging and
@@ -239,3 +242,41 @@ domains, never the real `%USERPROFILE%\GNUstep\Defaults`):**
    outside value.
 5. Registry mode (if it can be set up in the private home): the store
    refuses reads and writes.
+
+### 6.1 Windows rerun at 66e691e (winuitheme, 2026-11-15, report #33725)
+
+Windows 11 26300, MSYS2 CLANG64, fresh worktree, no `make install`.
+
+* **Isolation.** `HOMEDRIVE`/`HOMEPATH`, `GNUSTEP_HOME` and
+  `GNUSTEP_USER_ROOT` all pointed at a private home, with
+  `GNUSTEP_CONFIG_FILE` and `GNUSTEP_PATHLIST` unset. A fail-closed probe
+  ran before the build and before each launch and read back the private
+  `GNUstep/Defaults` every time. The real `GNUstep\Defaults` (entries,
+  sizes, timestamps) and `HKCU\Software\GNUstep` (absent) were unchanged
+  after the build and after every run.
+* **Build:** no warnings or errors; validator 0 errors, 0 warnings for the
+  Adwaita, Gumdrop and WinUITheme examples. Driven by `-GTSScript` with
+  `ThemeSettingsDemo`'s DemoNotes domain as the throwaway target.
+* **1. No opt-in: PASS.** The startup line ended "readable, NOT writable
+  (read-only)", and the message line said "this defaults backend is not
+  supported for editing yet".
+* **2. Opt-in write: PASS.** The line ended "readable, writable". Theme
+  Adwaita plus `adwaita.color-scheme` force-dark, Apply: "Saved. Restart
+  the affected applications to see every change." `defaults read` showed
+  both keys; the plist was complete XML with exactly those two keys; the
+  folder held only that plist and an empty `.lck` directory.
+* **3. Remove: PASS.** Reset, Apply: only `GSTheme` remained.
+* **4. Conflict: PASS.** An outside `defaults write` of the same key
+  between staging and Apply was refused with "Not saved:
+  GnomeThemeColorScheme changed elsewhere since you opened this ...". The
+  file kept the outside value, with no later write.
+* **5. Registry: NOT RUN.** A registry-mode run would reach the real
+  per-user registry, so winuitheme's session refused to launch it. The
+  gate's `:REGISTRY:` case (reads and writes refused) is covered by the
+  Linux tests (`Tests/GTSWriteReadBackTests.m`).
+* **Seen on the way (not a store issue):** the WinUITheme installed in
+  `clang64/lib/GNUstep/Themes` shadows `examples/` and has no
+  `ThemeSettings.plist`, so its settings weren't offered. That is the
+  catalog's normal order. The installed theme needs its plist (winuitheme
+  owns that).
+* gdnc started under the private home on two runs and exited on its own.

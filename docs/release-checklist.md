@@ -46,13 +46,14 @@ commit that is actually tagged.
 | AppImage test | `packaging/test-appimage.sh` passed on that build: new home OK, host theme roots OK with control, Apply saved into the scratch home ([packaging/README.md](../packaging/README.md)) |
 | Try-safely launcher | passed on that build (2026-11-13): normal run 0, isolation-removed control 2, tamper control 3 |
 | Theme files | Adwaita, Gumdrop, WinUITheme examples and `good.plist`: 0 errors, 0 warnings; the bad fixtures are rejected |
-| Windows | waiting for winuitheme's run (after its 11/15 reset) |
+| Windows | winuitheme's rerun at `66e691e` with the opt-in (2026-11-15, report #33725): steps 1-4 pass (read-only without it; write, remove, conflict with it); real defaults and registry unchanged; step 5 (registry) not run, covered by Linux tests ([windows.md 6.1](windows.md)) |
 
 Release notes: drafted in [release-notes-0.1.0.md](release-notes-0.1.0.md).
 
 **Windows decision (open):** either
-(a) the Windows test passes, and writes become the default on Windows in a
-separate tested push before the tag; or
+(a) writes become the default on Windows (the file backend only; the
+registry stays refused) in a separate tested push before the tag. The
+Windows test it needed has passed (steps 1-4); or
 (b) 0.1.0 ships with Windows read-only by default and the opt-in write path
 marked experimental. The release notes then say so.
 Dan decides which.
