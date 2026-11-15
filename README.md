@@ -112,8 +112,9 @@ The libraries, the app and the validator build with MSYS2 CLANG64; the
 recipe and the portability audit are in [docs/windows.md](docs/windows.md).
 **Editing is off by default on Windows**: the editor shows settings
 read-only. An opt-in write path (`GTS_ENABLE_WINDOWS_WRITES=1`, file
-backend only, every write read back) exists but is **pending a Windows
-rerun**; see [docs/windows.md](docs/windows.md) section 6.
+backend only, every write read back) passed winuitheme's Windows 11 test
+on 2026-11-15 (save, remove, conflict check); see
+[docs/windows.md](docs/windows.md) section 6.1.
 
 ## Status
 
