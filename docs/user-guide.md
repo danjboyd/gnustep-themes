@@ -34,6 +34,12 @@ To open the app on a particular application from a terminal:
 openapp ThemeSettings.app -GTSTargetApp /path/to/Some.app
 ```
 
+The heading above the settings names the target and the defaults domain
+its values go to, for example "Settings for: ThemeDemo
+(org.gnustep.ThemeDemo)". The domain is the application's
+`CFBundleIdentifier`; an application without one uses its executable's name
+(for example "ThemeDemo").
+
 ## The theme
 
 The **Theme** row picks the theme, for the current target. The lines under it
@@ -68,7 +74,10 @@ and changes nothing. Turn the switch on for all applications first.
 ## Settings
 
 Below the theme come the settings the selected theme describes. A theme
-that describes none says so. Each row has:
+that describes none says so. A theme's settings come from the
+`Resources/ThemeSettings.plist` in its installed bundle, so an older build
+of a theme may show none: Adwaita includes the file from 0.1.0-alpha24
+on. The line under the Theme row says which installed copy is used. Each row has:
 
 * **The control**: a menu of choices, or a text field for a name or number.
   The first menu item (for example "Automatic (…)" or "Default (Off)") means
