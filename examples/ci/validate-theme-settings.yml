@@ -5,7 +5,7 @@
 #
 # Edit the two values marked EDIT:
 #   THEME_PATH  - the .theme bundle (or the ThemeSettings.plist) in your repo
-#   GTS_COMMIT  - a gnustep-themes commit to pin (main is fine to start)
+#   GTS_COMMIT  - a gnustep-themes commit to pin (the v0.1.0 release commit by default)
 name: validate-theme-settings
 
 on:
@@ -21,7 +21,7 @@ jobs:
     container: debian:trixie
     env:
       THEME_PATH: MyTheme.theme                                   # EDIT
-      GTS_COMMIT: 92752b01c1c9f2162a57d338a18ea76809308f88        # EDIT
+      GTS_COMMIT: 73c0ced2c2c96147cd32f0f179c106e538d5f919        # v0.1.0; EDIT
     steps:
       - name: Install GNUstep base and make
         run: |

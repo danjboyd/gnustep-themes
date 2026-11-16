@@ -8,7 +8,8 @@ Warnings don't fail it.
 1. Copy [`examples/ci/validate-theme-settings.yml`](../examples/ci/validate-theme-settings.yml)
    to `.github/workflows/` in the theme's repo.
 2. Set `THEME_PATH` to the `.theme` bundle (or the `ThemeSettings.plist`)
-   in that repo, and `GTS_COMMIT` to the gnustep-themes commit to pin.
+   in that repo, and `GTS_COMMIT` to the gnustep-themes commit to pin. The
+   template pins the v0.1.0 release commit (`73c0ced`).
 3. Keep `actions/checkout` pinned by commit sha (the template pins v7.0.1;
    older v4 pins run on GitHub's deprecated Node 20).
 4. Push. The job installs GNUstep base and make on Debian 13, fetches the

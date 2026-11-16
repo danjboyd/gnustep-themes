@@ -1,8 +1,9 @@
 # First tagged release: checklist
 
-Status: **approved by Dan** (2026-11-16, ask #7553): build, recheck, then tag `v0.1.0`
-and publish a GitHub release, stopping at the first failing check. Results
-at the tagged commit are recorded below.
+Status: **released** 2026-11-16 as
+[v0.1.0](https://github.com/danjboyd/gnustep-themes/releases/tag/v0.1.0)
+at `73c0ced`, approved by Dan (ask #7553). Results at that commit are in
+"Release checks at v0.1.0" below.
 
 Proposed release: **Theme Settings 0.1.0**. It contains the editor app, the
 embeddable editor view, `ThemeSettingsKit`, the schema validator and
@@ -32,6 +33,19 @@ Set the same version in all four places, in one commit on main:
 | Theme files | `scripts/validate-theme.sh` on every `examples/*.theme`, plus the owners' own files (Adwaita CI already runs it) | 0 errors |
 | Windows | winuitheme's run of `docs/windows.md` section 6 (after its 11/15 reset) | report id |
 
+### Release checks at v0.1.0 (`73c0ced`, 2026-11-16)
+
+| Check | Result |
+|---|---|
+| Linux CI | GitHub CI run 43917495917: success |
+| Local CI | `scripts/ci.sh`: all steps passed, 137 tests, 0 failures |
+| GUI scenarios | `scripts/screenshots.sh` on a private Xvfb: 14 of 14 CHECK lines ok (B, C, D, E, F, N) |
+| AppImage build | `package-appimage` run 43917495796: success. `ThemeSettings-0.1.0-x86_64.AppImage`, sha256 `7ca259e8681856fa71df5ef85342a813ed328e1f593de318d014edb8c30428f7` (the release asset matches) |
+| AppImage test | `packaging/test-appimage.sh`: first launch in a new home OK; Gumdrop offered only via `GTS_HOST_THEME_ROOTS` (control OK); Apply wrote `GSTheme` Adwaita and the purple accent into the scratch home only |
+| Try-safely launcher | normal run 0 (real settings unchanged); isolation-removed control 2 (nothing launched); tamper control 3 |
+| Theme files | Adwaita, Gumdrop, WinUITheme examples and `good.plist`: 0 errors, 0 warnings; bad fixtures rejected |
+| Windows | winuitheme's run at `66e691e` (report #33725): steps 1-4 pass; editing on by default since `7ca155e` (Dan's choice (a)) |
+
 ### Dry run at main `6ea3cb2` (2026-11-13; not the tag commit)
 
 This records where each check stands today. All of them run again at the
@@ -50,13 +64,9 @@ commit that is actually tagged.
 
 Release notes: drafted in [release-notes-0.1.0.md](release-notes-0.1.0.md).
 
-**Windows decision (open):** either
-(a) writes become the default on Windows (the file backend only; the
-registry stays refused) in a separate tested push before the tag. The
-Windows test it needed has passed (steps 1-4); or
-(b) 0.1.0 ships with Windows read-only by default and the opt-in write path
-marked experimental. The release notes then say so.
-Dan decides which.
+**Windows decision:** Dan chose (a) (ask #7511): editing is on by default
+on Windows for the file backend (`7ca155e`); the registry stays refused and
+`GTS_ENABLE_WINDOWS_WRITES=0` turns editing off.
 
 ## 3. Release notes (draft: [release-notes-0.1.0.md](release-notes-0.1.0.md))
 
@@ -87,6 +97,6 @@ Dan decides which.
 
 ## 5. After the release
 
-- [ ] Point the theme-CI snippet's `GTS_COMMIT` (examples/ci,
+- [x] Point the theme-CI snippet's `GTS_COMMIT` (examples/ci,
       docs/theme-ci.md) at the tag. Tell adwaita, which pins it in its CI.
-- [ ] Set `package-version` back to the next `-dev` version.
+- [x] Set `package-version` back to the next `-dev` version (0.1.1-dev).
