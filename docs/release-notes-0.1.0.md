@@ -1,8 +1,7 @@
-# Theme Settings 0.1.0: release notes (DRAFT)
+# Theme Settings 0.1.0: release notes
 
-Status: **draft, not released.** No tag exists. Dan approves the release;
-see [release-checklist.md](release-checklist.md). This version of the notes
-assumes his Windows choice (a), editing on by default.
+Tag `v0.1.0`. Checks run at the tagged commit are recorded in
+[release-checklist.md](release-checklist.md).
 
 ## What it is
 
@@ -36,6 +35,9 @@ It comes in two forms that share the same editor:
     silently.
   - Every write is read back and checked.
   - An unreadable settings file is shown as refused, never rewritten.
+- **Follow GNOME (Adwaita).** A switch that lets Adwaita follow GNOME's
+  light/dark style and accent colour, or keeps GNOME's current values as
+  fixed ones (user guide, "Follow GNOME (Adwaita)").
 - **Proven end to end** with Adwaita and Gumdrop. Changing a setting in the
   editor changes how the theme draws ([end-to-end.md](end-to-end.md)).
 - **AppImage** for Linux x86_64, with its own GNUstep runtime. It lists the
@@ -62,8 +64,9 @@ It comes in two forms that share the same editor:
 
 - **Launcher and "/".** The AppImage launcher prefixes the current folder to
   a command-line option value that contains "/" but doesn't start with it.
-  For example, `-Key text/plain` arrives as `-Key $PWD/text/plain`. A fix is
-  planned in gnustep-packager. Normal use passes no such options.
+  For example, `-Key text/plain` arrives as `-Key $PWD/text/plain`. The fix
+  is in review in gnustep-packager and is planned for 0.1.1. Normal use
+  passes no such options.
 - **Restart needed.** Most settings take effect when the application
   restarts. Each row says when its setting applies.
 - **Interfaces may change.** The library interface version is 0, so

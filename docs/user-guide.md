@@ -130,17 +130,19 @@ at the bottom says why:
 ## Install and run the AppImage
 
 Theme Settings is also built as a single-file AppImage for Linux (x86_64),
-with its own GNUstep runtime. There is no tagged release yet. Each build is a
-download from the manual `package-appimage` workflow on GitHub, and GitHub
-deletes those downloads after a few days.
+with its own GNUstep runtime.
 
-1. **Download.** Open the repository's **Actions** tab, then the latest
-   successful **package-appimage** run. Download the artifact
-   `theme-settings-appimage-packages` and unzip it. With the GitHub CLI:
+1. **Download** `ThemeSettings-0.1.0-x86_64.AppImage` from the
+   [v0.1.0 release](https://github.com/danjboyd/gnustep-themes/releases/tag/v0.1.0)
+   and check it against the sha256 given there. With the GitHub CLI:
 
    ```sh
-   gh run download <run-id> -R danjboyd/gnustep-themes -n theme-settings-appimage-packages -D ThemeSettings-appimage
+   gh release download v0.1.0 -R danjboyd/gnustep-themes -D ThemeSettings-appimage
    ```
+
+   Builds newer than the release come from the manual `package-appimage`
+   workflow (the repository's **Actions** tab); GitHub deletes those
+   downloads after a few days.
 
 2. **Make it executable:**
    `chmod +x ThemeSettings-appimage/ThemeSettings-*-x86_64.AppImage`.

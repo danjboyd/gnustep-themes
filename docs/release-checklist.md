@@ -1,8 +1,8 @@
-# First tagged release: checklist (DRAFT)
+# First tagged release: checklist
 
-Status: **draft, not approved.** Nothing here has been tagged or released.
-Dan approves the release itself, and every step below that tags, publishes
-or uploads anything.
+Status: **approved by Dan** (2026-11-16, ask #7553): build, recheck, then tag `v0.1.0`
+and publish a GitHub release, stopping at the first failing check. Results
+at the tagged commit are recorded below.
 
 Proposed release: **Theme Settings 0.1.0**. It contains the editor app, the
 embeddable editor view, `ThemeSettingsKit`, the schema validator and
