@@ -14,7 +14,7 @@
 /* Control tags: the theme popup has its own tag; row i's controls carry
    kRowTagBase + i, so no row control can be mistaken for the theme popup
    (both used to be 0). */
-enum { kThemePopupTag = 1, kRowTagBase = 1000 };
+enum { kThemePopupTag = 1, kFollowSwitchTag = 2, kRowTagBase = 1000 };
 
 /* kScrollerW: room for the vertical scroller, so the content view (and the
    Reset column) is laid out inside the visible width, not under it. */
@@ -203,6 +203,27 @@ static NSString *fittedTitle(NSString *title, NSFont *font, float room);
   if ([note length] > 0)
     {
       float h = wrappedHeight(note, width - x2 - kMargin, 10);
+      t = label(note, 10, NO, [NSColor darkGrayColor]);
+      [[t cell] setWraps: YES];
+      [t setFrame: NSMakeRect(x2, y, width - x2 - kMargin, h)];
+      [_content addSubview: t];
+      y += h + 4;
+    }
+  if ([_model offersFollowSystem])
+    {
+      NSButton *b = [[[NSButton alloc] initWithFrame: NSMakeRect(x2, y, kControlW + kResetW, 22)] autorelease];
+      float h;
+      [b setButtonType: NSSwitchButton];
+      [b setTitle: [_model followSystemTitle]];
+      [b setState: [_model followsSystem] ? NSOnState : NSOffState];
+      [b setTag: kFollowSwitchTag];
+      [b setTarget: self];
+      [b setAction: @selector(followChanged:)];
+      [b setEnabled: editable];
+      [_content addSubview: b];
+      y += 24;
+      note = [_model followSystemNote];
+      h = wrappedHeight(note, width - x2 - kMargin, 10);
       t = label(note, 10, NO, [NSColor darkGrayColor]);
       [[t cell] setWraps: YES];
       [t setFrame: NSMakeRect(x2, y, width - x2 - kMargin, h)];
@@ -416,6 +437,14 @@ fieldText(NSTextField *f)
       [p sendAction: [p action] to: [p target]];
       return YES;
     }
+  if ([verb isEqual: @"follow"] && [w count] == 2)
+    {
+      NSButton *b = (NSButton*)[self controlOfClass: [NSButton class] tag: kFollowSwitchTag title: nil];
+      BOOL on = [[w objectAtIndex: 1] isEqual: @"on"];
+      if (b == nil || ![b isEnabled] || ([b state] == NSOnState) == on) return NO;
+      [b performClick: self];
+      return [_model followsSystem] == on;
+    }
   if ([verb isEqual: @"type"] && [w count] >= 3)
     {
       /* Click into the field and type, leaving the edit uncommitted. */
@@ -503,6 +532,13 @@ fieldText(NSTextField *f)
       [sender selectText: self];
       return;
     }
+  [self reloadFromModel];
+}
+
+- (void) followChanged: (id)sender
+{
+  if (![_model setFollowsSystem: [sender state] == NSOnState])
+    [self refreshButtons];     /* refused: the message says why */
   [self reloadFromModel];
 }
 

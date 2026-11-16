@@ -99,7 +99,7 @@
 {
   [_store release]; [_catalog release]; [_appDomain release]; [_appName release];
   [_appInfo release]; [_session release]; [_globalBaseline release]; [_message release];
-  [_hostDomain release]; [_lastOutcome release]; [_sidecar release]; [_appImagePath release]; [_roApp release];
+  [_hostDomain release]; [_lastOutcome release]; [_sidecar release]; [_appImagePath release]; [_roApp release]; [_gnome release];
   [super dealloc];
 }
 
@@ -619,6 +619,153 @@ stateText(GTSResolvedValue *v, BOOL global)
   if ([self refuseReadOnly: row]) return;
   [self clearOutcome];
   [_session stageResetForSetting: [row setting]];
+}
+
+/* ---- Follow GNOME (Adwaita) ---- */
+
+static NSString *const kAdwaitaIdentifier = @"org.gnustep.themes.adwaita";
+static NSString *const kSchemeKey = @"GnomeThemeColorScheme";
+static NSString *const kAccentKey = @"GnomeThemeAccentColor";
+
+- (void) setGnomeSettings: (GTSGnomeSettings*)gnome { ASSIGN(_gnome, gnome); }
+
+- (GTSGnomeSettings*) gnome
+{
+  return _gnome != nil ? _gnome : [GTSGnomeSettings systemSettings];
+}
+
+/* The two Adwaita settings, or nil if this target can't show them. */
+- (NSArray*) followSettings
+{
+  GTSThemeSettingsSchema *sc = [self currentSchema];
+  NSString *scope = [self targetIsGlobal] ? GTSScopeGlobal : GTSScopeApplication;
+  GTSSettingDescriptor *a, *b;
+  if (_session == nil || _sidecar != nil || sc == nil) return nil;
+  if (![[sc themeIdentifier] isEqual: kAdwaitaIdentifier]) return nil;
+  a = [sc settingForKey: kSchemeKey];
+  b = [sc settingForKey: kAccentKey];
+  if (a == nil || b == nil || ![a supportsScope: scope] || ![b supportsScope: scope]) return nil;
+  return [NSArray arrayWithObjects: a, b, nil];
+}
+
+- (BOOL) offersFollowSystem { return [self followSettings] != nil; }
+
+- (NSString*) followSystemTitle { return @"Follow GNOME's light/dark and accent"; }
+
+- (BOOL) followsSystem
+{
+  NSEnumerator *e = [[self followSettings] objectEnumerator];
+  GTSSettingsResolver *res = [self resolver];
+  GTSSettingDescriptor *s;
+  if ([self followSettings] == nil) return NO;
+  while ((s = [e nextObject]) != nil)
+    {
+      GTSResolvedValue *v = [res resolveSetting: s];
+      if ([v explicitValue] != nil) return NO;
+      if (![self targetIsGlobal] && [v globalValue] != nil) return NO;
+    }
+  return YES;
+}
+
+/* GNOME's current values mapped onto Adwaita's: color-scheme
+   "prefer-dark" is Dark, anything else ("default", "prefer-light") Light;
+   accent-color by name, else blue (Adwaita's own fallback). nil if GNOME's
+   colour scheme can't be read. */
+- (NSDictionary*) gnomeValuesFor: (NSArray*)settings
+{
+  GTSGnomeSettings *g = [self gnome];
+  NSString *scheme = [g interfaceStringForKey: @"color-scheme"];
+  NSString *accent = [g interfaceStringForKey: @"accent-color"];
+  GTSSettingDescriptor *acc = [settings objectAtIndex: 1];
+  if (scheme == nil) return nil;
+  if (accent == nil || [acc problemWithValue: accent] != nil) accent = @"blue";
+  return [NSDictionary dictionaryWithObjectsAndKeys:
+    ([scheme isEqual: @"prefer-dark"] ? @"force-dark" : @"force-light"), kSchemeKey,
+    accent, kAccentKey, nil];
+}
+
+- (NSString*) followSystemNote
+{
+  NSArray *ss = [self followSettings];
+  NSDictionary *now;
+  NSString *gn;
+  if (ss == nil) return nil;
+  now = [self gnomeValuesFor: ss];
+  gn = now == nil ? @"GNOME's settings can't be read here, so Adwaita uses light and blue."
+    : [NSString stringWithFormat: @"GNOME now: %@, %@.",
+        [self titleForValue: [now objectForKey: kSchemeKey] setting: [ss objectAtIndex: 0]],
+        [self titleForValue: [now objectForKey: kAccentKey] setting: [ss objectAtIndex: 1]]];
+  if ([self followsSystem])
+    return [NSString stringWithFormat: @"On: Adwaita reads GNOME's light/dark and accent colour when the application starts. %@", gn];
+  if (![self targetIsGlobal])
+    {
+      GTSSettingsResolver *res = [self resolver];
+      NSEnumerator *e = [ss objectEnumerator];
+      GTSSettingDescriptor *s;
+      BOOL ownSet = NO;
+      while ((s = [e nextObject]) != nil)
+        if ([[res resolveSetting: s] explicitValue] != nil) ownSet = YES;
+      if (!ownSet)
+        return [NSString stringWithFormat: @"Off: all applications use fixed values, and this application inherits them. Turn this on for all applications to follow GNOME. %@", gn];
+    }
+  return [NSString stringWithFormat: @"Off: the choices below are fixed. %@", gn];
+}
+
+- (BOOL) setFollowsSystem: (BOOL)follow
+{
+  NSArray *ss = [self followSettings];
+  NSEnumerator *e;
+  GTSSettingDescriptor *s;
+  if (ss == nil) return NO;
+  if (![self storeIsWritable])
+    {
+      [self setMessage: @"this defaults backend is not supported for editing yet"];
+      return NO;
+    }
+  e = [ss objectEnumerator];
+  while ((s = [e nextObject]) != nil)
+    if ([s isReadOnly])
+      {
+        [self setMessage: [NSString stringWithFormat: @"%@ is read-only in this version of the editor.", [s title]]];
+        return NO;
+      }
+  [self clearOutcome];
+  if (follow)
+    {
+      if (![self targetIsGlobal])
+        {
+          GTSSettingsResolver *res = [self resolver];
+          e = [ss objectEnumerator];
+          while ((s = [e nextObject]) != nil)
+            if ([[res resolveSetting: s] globalValue] != nil)
+              {
+                [self setMessage: @"All applications has a fixed style or accent colour, so this application can't follow GNOME on its own. Turn on Follow GNOME for all applications."];
+                return NO;
+              }
+        }
+      e = [ss objectEnumerator];
+      while ((s = [e nextObject]) != nil)
+        [_session stageResetForSetting: s];
+      return YES;
+    }
+  else
+    {
+      NSDictionary *now = [self gnomeValuesFor: ss];
+      NSString *problem = nil;
+      if (now == nil)
+        {
+          [self setMessage: @"GNOME's settings can't be read here; choose a style and an accent colour below instead."];
+          return NO;
+        }
+      e = [ss objectEnumerator];
+      while ((s = [e nextObject]) != nil)
+        if (![_session stageValue: [now objectForKey: [s key]] forSetting: s problem: &problem])
+          {
+            [self setMessage: problem];
+            return NO;
+          }
+      return YES;
+    }
 }
 
 /* ---- apply/cancel ---- */

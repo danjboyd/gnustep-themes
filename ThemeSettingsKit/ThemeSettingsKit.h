@@ -8,3 +8,4 @@
 #import <ThemeSettingsKit/GTSEditorModel.h>
 #import <ThemeSettingsKit/GTSAppImageSidecar.h>
 #import <ThemeSettingsKit/GTSSHA256.h>
+#import <ThemeSettingsKit/GTSGnomeSettings.h>
