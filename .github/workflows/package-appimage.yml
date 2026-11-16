@@ -8,7 +8,7 @@ on:
 
 jobs:
   package:
-    uses: danjboyd/gnustep-packager/.github/workflows/package-gnustep-app.yml@9a8c784a3366d0d05192d61946ba3580dd8b00bb
+    uses: danjboyd/gnustep-packager/.github/workflows/package-gnustep-app.yml@a9d4e4661a9b77f83673518ccbcf93979815ae56  # v0.1.11
     with:
       manifest-path: packaging/package.manifest.json
       backend: appimage

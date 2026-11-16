@@ -65,10 +65,9 @@ run() {  # log-file args...   (HOSTROOTS, if set, becomes GTS_HOST_THEME_ROOTS)
 }
 
 # 1. Read-only launch: diagnostics must name a defaults root inside $root.
-# The first step is an absolute path: the AppImage launcher absolutizes a
-# leading relative word of an argument (seen: "log; ..." -> "$PWD/log; ...").
-# "nop" absorbs that rewrite (it fails; the remaining steps run normally).
-run "$out/1-readonly.log" -GTSScript "nop; shot $out/AI1-initial-global.png; log"
+# (Builds before gnustep-packager v0.1.11 absolutized a leading relative
+# word of an argument and needed a throwaway first step; v0.1.11 fixed it.)
+run "$out/1-readonly.log" -GTSScript "shot $out/AI1-initial-global.png; log"
 line=$(grep -m1 'Defaults root:' "$out/1-readonly.log" || true)
 echo "test-appimage: $line"
 case "$line" in
@@ -86,9 +85,9 @@ fi
 
 # 2. Themes from the host theme roots: both scratch-installed themes offered;
 #    set the global theme to Adwaita and the accent to purple; Apply.
-run "$out/2-apply.log" -GTSScript "nop; theme Adwaita; shot $out/AI2-adwaita-chosen.png; choose adwaita.accent-color purple; shot $out/AI3-staged.png; apply; log; shot $out/AI4-applied.png"
-HOSTROOTS="$root/hostthemes" run "$out/3-gumdrop.log" -GTSScript "nop; theme Gumdrop; shot $out/AI5-gumdrop-from-host-root.png; cancel; log"
-HOSTROOTS="" run "$out/4-no-hostroot.log" -GTSScript "nop; theme Gumdrop; log"
+run "$out/2-apply.log" -GTSScript "theme Adwaita; shot $out/AI2-adwaita-chosen.png; choose adwaita.accent-color purple; shot $out/AI3-staged.png; apply; log; shot $out/AI4-applied.png"
+HOSTROOTS="$root/hostthemes" run "$out/3-gumdrop.log" -GTSScript "theme Gumdrop; shot $out/AI5-gumdrop-from-host-root.png; cancel; log"
+HOSTROOTS="" run "$out/4-no-hostroot.log" -GTSScript "theme Gumdrop; log"
 grep -q 'script: theme Gumdrop -> ok' "$out/3-gumdrop.log" && echo "test-appimage: HOST-ROOT: ok (Gumdrop offered only via GTS_HOST_THEME_ROOTS)" || echo "test-appimage: HOST-ROOT: FAILED"
 grep -q 'script: theme Gumdrop -> FAILED' "$out/4-no-hostroot.log" && echo "test-appimage: HOST-ROOT control: ok (not offered without it)" || echo "test-appimage: HOST-ROOT control: FAILED"
 echo "--- stored NSGlobalDomain (scratch) ---"

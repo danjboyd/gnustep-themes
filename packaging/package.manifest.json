@@ -1,5 +1,5 @@
 {
-  "$schema": "https://raw.githubusercontent.com/danjboyd/gnustep-packager/9a8c784/schemas/gnustep-packager.schema.json",
+  "$schema": "https://raw.githubusercontent.com/danjboyd/gnustep-packager/a9d4e46/schemas/gnustep-packager.schema.json",
   "schemaVersion": 1,
   "profiles": [
     "gnustep-gui"

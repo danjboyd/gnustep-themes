@@ -192,12 +192,13 @@ separate settings file.
 theme's `ThemeSettings.plist` and never loads theme code. The editor window
 itself always uses the plain GNUstep look, whichever theme you choose.
 
-**Known launcher issue.** The AppImage's launcher treats a command-line
-option value that contains "/" but doesn't start with "/" as a relative path,
-and prefixes the current folder to it. For example, `-Key text/plain` reaches
-the app as `-Key $PWD/text/plain`. Normal use doesn't pass such options. A fix
-is planned in gnustep-packager; until then, give such values as absolute
-paths or avoid "/".
+**Launcher issue in 0.1.0.** The 0.1.0 AppImage's launcher treats a
+command-line option value that contains "/" but doesn't start with "/" as a
+relative path, and prefixes the current folder to it. For example,
+`-Key text/plain` reaches the app as `-Key $PWD/text/plain`. Normal use
+doesn't pass such options. Builds made with gnustep-packager v0.1.11 or later
+(after 0.1.0) leave such values alone unless they name a folder that exists
+in the current folder.
 
 ## AppImage theme information
 

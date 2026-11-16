@@ -2,7 +2,7 @@
 
 `package.manifest.json` describes the Theme Settings app for
 [gnustep-packager](https://github.com/danjboyd/gnustep-packager), pinned at
-9a8c784 in `.github/workflows/package-appimage.yml`. That workflow is
+release v0.1.11 (`a9d4e46`) in `.github/workflows/package-appimage.yml`. That workflow is
 manual-only. It builds `ThemeSettings-<version>-x86_64.AppImage` as a GitHub
 artifact; it never makes a release or a tag.
 
