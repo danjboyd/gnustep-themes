@@ -100,11 +100,27 @@ on Windows for the file backend (`7ca155e`); the registry stays refused and
 Same procedure as 0.1.0: version 0.1.1 in the four places above, the
 release build and every check in section 2 at the tagged commit, then tag
 `v0.1.1` and a GitHub release with the AppImage. Notes:
-[release-notes-0.1.1.md](release-notes-0.1.1.md). Results are recorded
-below once the checks have run.
+[release-notes-0.1.1.md](release-notes-0.1.1.md).
+
+Released 2026-11-16 as
+[v0.1.1](https://github.com/danjboyd/gnustep-themes/releases/tag/v0.1.1)
+at `68595ac`.
+
+| Check | Result |
+|---|---|
+| Linux CI | GitHub CI run 43951397873: success |
+| Local CI | `scripts/ci.sh`: all steps passed, 137 tests, 0 failures |
+| GUI scenarios | `scripts/screenshots.sh` on a private Xvfb: 14 of 14 CHECK lines ok (B, C, D, E, F, N) |
+| AppImage build | `package-appimage` run 43951416768: success. `ThemeSettings-0.1.1-x86_64.AppImage`, sha256 `d3569ff1a2565a991248fadf7b6d2686d2b7cd86ba945e7a2314b4b9996b1511` (the release asset matches) |
+| AppImage test | `packaging/test-appimage.sh`, with no workaround step: first launch in a new home OK; Gumdrop offered only via `GTS_HOST_THEME_ROOTS` (control OK); Apply wrote `GSTheme` Adwaita and the purple accent into the scratch home only |
+| Try-safely launcher | normal run 0 (real settings unchanged); isolation-removed control 2 (nothing launched); tamper control 3 |
+| Theme files | Adwaita, Gumdrop, WinUITheme examples and `good.plist`: 0 errors, 0 warnings; bad fixtures rejected |
+
+The theme-CI snippet stays pinned at v0.1.0: the validator is unchanged in
+0.1.1.
 
 ## 5. After the release
 
 - [x] Point the theme-CI snippet's `GTS_COMMIT` (examples/ci,
       docs/theme-ci.md) at the tag. Tell adwaita, which pins it in its CI.
-- [x] Set `package-version` back to the next `-dev` version (0.1.1-dev).
+- [x] Set `package-version` back to the next `-dev` version (0.1.1-dev; after 0.1.1, 0.1.2-dev).
