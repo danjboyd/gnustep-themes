@@ -2,9 +2,13 @@ name: package-msi
 
 # DRAFT, manual only: builds a Theme Settings MSI with gnustep-packager
 # v0.1.11's MSI job (as tools-xctest's packaged-app example does). Not yet
-# run; no tag trigger and no release.
+# run; no tag trigger and no release. GitHub can dispatch a workflow only
+# once it is on the default branch, so until then a push to the msi-draft
+# branch runs it.
 on:
   workflow_dispatch:
+  push:
+    branches: [msi-draft]
 
 jobs:
   package:
