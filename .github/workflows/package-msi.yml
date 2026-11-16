@@ -1,0 +1,20 @@
+name: package-msi
+
+# DRAFT, manual only: builds a Theme Settings MSI with gnustep-packager
+# v0.1.11's MSI job (as tools-xctest's packaged-app example does). Not yet
+# run; no tag trigger and no release.
+on:
+  workflow_dispatch:
+
+jobs:
+  package:
+    uses: danjboyd/gnustep-packager/.github/workflows/package-gnustep-app.yml@a9d4e4661a9b77f83673518ccbcf93979815ae56  # v0.1.11
+    with:
+      manifest-path: packaging/msi/package.manifest.json
+      backend: msi
+      package-version: 0.1.2-dev
+      msys2-packages: mingw-w64-clang-x86_64-gnutls mingw-w64-clang-x86_64-pkgconf mingw-w64-clang-x86_64-imagemagick
+      run-validation: true
+      run-smoke: true
+      artifact-name: theme-settings-msi
+      artifact-retention-days: 7

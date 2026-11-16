@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/danjboyd/gnustep-packager/a9d4e46/schemas/gnustep-packager.schema.json",
+  "schemaVersion": 1,
+  "profiles": [
+    "gnustep-gui"
+  ],
+  "package": {
+    "id": "io.github.danjboyd.ThemeSettings",
+    "name": "ThemeSettings",
+    "displayName": "Theme Settings",
+    "version": "0.1.1",
+    "manufacturer": "Daniel Boyd",
+    "summary": "Choose a GNUstep theme and change its settings for all applications or one.",
+    "license": "LGPL-2.1-or-later",
+    "homepage": "https://github.com/danjboyd/gnustep-themes"
+  },
+  "pipeline": {
+    "workingDirectory": "../..",
+    "shell": {
+      "kind": "msys2-bash",
+      "bootstrapCommands": [],
+      "environment": {}
+    },
+    "build": {
+      "command": "bash packaging/msi/build.sh"
+    },
+    "stage": {
+      "command": "bash packaging/msi/stage.sh dist/stage",
+      "outputRoot": "../../dist/stage"
+    }
+  },
+  "payload": {
+    "layoutVersion": 1,
+    "stageRoot": "../../dist/stage",
+    "appRoot": "app",
+    "runtimeRoot": "runtime",
+    "metadataRoot": "metadata"
+  },
+  "launch": {
+    "entryRelativePath": "app/ThemeSettings.app/ThemeSettings.exe",
+    "workingDirectory": "app/ThemeSettings.app",
+    "arguments": [
+      "-GSTheme",
+      "GNUstep"
+    ],
+    "pathPrepend": [
+      "runtime/bin"
+    ],
+    "env": {}
+  },
+  "outputs": {
+    "root": "../../dist",
+    "packageRoot": "../../dist/packages",
+    "logRoot": "../../dist/logs",
+    "tempRoot": "../../dist/tmp",
+    "validationRoot": "../../dist/validation"
+  },
+  "validation": {
+    "smoke": {
+      "enabled": true,
+      "kind": "staged-layout",
+      "requiredPaths": [
+        "app/ThemeSettings.app/ThemeSettings.exe",
+        "runtime/bin/GNUstep.conf",
+        "runtime/bin/defaults.exe",
+        "runtime/System/Tools/gdnc.exe"
+      ],
+      "timeoutSeconds": 30
+    },
+    "logs": {
+      "retainOnSuccess": true
+    }
+  },
+  "integrations": {
+    "shortcutName": "Theme Settings",
+    "fileAssociations": []
+  },
+  "updates": {
+    "enabled": false
+  },
+  "compliance": {
+    "runtimeNotices": [
+      {
+        "name": "GNUstep Runtime",
+        "license": "LGPL-2.1-or-later",
+        "stageRelativePath": "metadata/licenses/gnustep-runtime.txt"
+      }
+    ]
+  },
+  "backends": {
+    "msi": {
+      "enabled": true,
+      "upgradeCode": "493abd2f-109c-4f67-8e30-a43e3261d907",
+      "installScope": "perUser",
+      "productName": "Theme Settings",
+      "shortcutName": "Theme Settings",
+      "installDirectoryName": "Theme Settings",
+      "launcherFileName": "ThemeSettings.exe"
+    },
+    "appimage": {
+      "enabled": false
+    }
+  }
+}
