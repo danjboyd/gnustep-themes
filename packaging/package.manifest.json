@@ -8,7 +8,7 @@
     "id": "io.github.danjboyd.ThemeSettings",
     "name": "ThemeSettings",
     "displayName": "Theme Settings",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "manufacturer": "Daniel Boyd",
     "summary": "Choose a GNUstep theme and change its settings for all applications or one.",
     "license": "LGPL-2.1-or-later",

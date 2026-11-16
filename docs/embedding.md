@@ -23,7 +23,7 @@ build a host:
 1. **Against the installed libraries (preferred for a separate project).**
    The top-level `GNUmakefile` builds `libThemeSettingsKit` (Foundation +
    GnuTLS) and `libThemeSettingsUI` (the editor; NEEDED: Kit, gnustep-gui,
-   gnustep-base). Both are soname `.so.0` (version 0.1.0). Public headers:
+   gnustep-base). Both are soname `.so.0` (version 0.1.1). Public headers:
    `<ThemeSettingsKit/ThemeSettingsKit.h>` and
    `<ThemeSettingsUI/ThemeSettingsUI.h>` (umbrella headers). The host links
    `-lThemeSettingsUI -lThemeSettingsKit -lgnustep-gui`; it needs no

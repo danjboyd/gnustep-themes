@@ -95,6 +95,14 @@ on Windows for the file backend (`7ca155e`); the registry stays refused and
 | Tag `v0.1.0` and GitHub release with the AppImage attached | gnustep-themes after Dan's go, or Dan | **Dan's explicit go** (an ask with the evidence above) |
 | Announcing it anywhere outside Dan's repos | nobody without Dan | upstream proposal rules |
 
+## 0.1.1 (approved by Dan, ask #7754, 2026-11-16)
+
+Same procedure as 0.1.0: version 0.1.1 in the four places above, the
+release build and every check in section 2 at the tagged commit, then tag
+`v0.1.1` and a GitHub release with the AppImage. Notes:
+[release-notes-0.1.1.md](release-notes-0.1.1.md). Results are recorded
+below once the checks have run.
+
 ## 5. After the release
 
 - [x] Point the theme-CI snippet's `GTS_COMMIT` (examples/ci,

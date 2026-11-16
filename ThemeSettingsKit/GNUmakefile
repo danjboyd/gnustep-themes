@@ -2,7 +2,7 @@ include $(GNUSTEP_MAKEFILES)/common.make
 include ../gts-config.make
 
 LIBRARY_NAME = libThemeSettingsKit
-VERSION = 0.1.0
+VERSION = 0.1.1
 libThemeSettingsKit_OBJC_FILES = $(wildcard GTS*.m)
 libThemeSettingsKit_HEADER_FILES = ThemeSettingsKit.h $(wildcard GTS*.h)
 libThemeSettingsKit_HEADER_FILES_INSTALL_DIR = ThemeSettingsKit

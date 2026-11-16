@@ -118,7 +118,7 @@ remove, conflict check). A registry-backed configuration is refused, and
 
 ## Status
 
-Version 0.1.0. The schema (v1) is settled; library interfaces may still
+Version 0.1.1. The schema (v1) is settled; library interfaces may still
 change (shared library version 0). See [docs/platforms.md](docs/platforms.md)
 for what is and isn't supported on each platform, and
 [docs/module-map.md](docs/module-map.md) for what has been checked and the
