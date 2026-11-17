@@ -24,24 +24,22 @@ been released.
   toolchain removed from PATH, and was still running after 5 seconds.
 - **Uninstall:** the MSI uninstalled cleanly.
 
-## Gaps (not yet checked)
+## Gaps
 
-- **The editor's own behaviour from the MSI:** listing themes, reading and
-  saving defaults, the conflict check. The source build passed these on
-  Windows 11 ([windows.md](windows.md) 6.1); the MSI build hasn't been
-  through them. The steps for winuitheme are in "Windows check of the
-  installed MSI" below; running them needs Dan's go (it installs software).
-- **Themes:** the MSI bundles none. Which theme folders it lists on Windows
-  (the user's `GNUstep\Library\Themes`; WinUITheme installs) is not yet
-  confirmed.
+- **Themes:** the MSI bundles none. It lists the user's
+  `GNUstep\Library\Themes` (checked on Windows, below).
+- **Launcher output.** The top-level `ThemeSettings.exe` is the packager's
+  launcher: it starts the app detached and exits, so nothing reaches its
+  stdout or stderr. Arguments do pass through.
 - **Not signed.** Windows SmartScreen will warn on first run.
 - **No icon of its own:** GNUstep's icon, as in the AppImage.
 
 ## Windows check of the installed MSI (for winuitheme; needs Dan's go)
 
-Not run yet. Installing the MSI puts software on the Windows host, so
-winuitheme runs this only after Dan says yes. Use the workflow artifact
-named above, and check its sha256 first.
+Passed 7 of 7 on 2026-11-17 (results below). Installing the MSI puts
+software on the Windows host, so winuitheme runs this only after Dan says
+yes. Use the workflow artifact of the build being checked, and check its
+sha256 first.
 
 1. **Install** `ThemeSettings-*-win64.msi` per-user
    (`msiexec /i <file> /qn /l*v install.log`). Expect
@@ -55,8 +53,11 @@ named above, and check its sha256 first.
    MSI carries its own `runtime\bin\GNUstep.conf`, so this probe is what
    proves the isolation, not the variables alone. Record the real
    `GNUstep\Defaults` and `HKCU\Software\GNUstep` before and after.
-3. **Startup line.** Start the installed `ThemeSettings.exe` from a shell
-   so stderr is visible. The defaults-root line names the private home and
+3. **Startup line.** The top-level `ThemeSettings.exe` is a launcher that
+   detaches, so for steps 3-5 start `app\ThemeSettings.app\ThemeSettings.exe`
+   directly with the launcher's environment (`runtime\bin` first on PATH,
+   `GNUSTEP_PATHPREFIX_LIST=<install>\runtime`, `-GSTheme GNUstep`), so
+   stderr is visible. The defaults-root line names the private home and
    ends "readable, writable".
 4. **Themes listed.** Copy `examples/*.theme` into the private home's
    `GNUstep\Library\Themes`. All three appear in the Theme menu. Note any
@@ -72,6 +73,27 @@ named above, and check its sha256 first.
 
 Report: the MSI's sha256, Windows build, each step's result, and the
 before/after comparison from step 2.
+
+### Results (winuitheme, 2026-11-17)
+
+MSI from `package-msi` run 44136582495 at `f363602`, sha256 `999ed99b…7a182`;
+Windows 11 build 26300, MSYS2 off PATH.
+
+| Step | Result |
+|---|---|
+| 1. Install | PASS: exit 0, no administrator prompt; `%LOCALAPPDATA%\Theme Settings\` and the Start menu shortcut |
+| 2. Isolate | PASS: before each of 6 launches, the MSI's `defaults.exe` read a marker domain that exists only in the private home |
+| 3. Startup line | PASS: private `GNUstep/Defaults`, "readable, writable" |
+| 4. Themes | PASS: Adwaita, Gumdrop and WinUITheme from the private `Library\Themes`; an unknown theme refused; no other folders listed |
+| 5. Write, remove, conflict | PASS, as in [windows.md](windows.md) 6.1; `.lck` empty and no partial file each time |
+| 6. Shortcut | PASS: opened from the isolated shell, plain GNUstep look, closed cleanly |
+| 7. Uninstall | PASS: exit 0; folder, shortcut and uninstall entry gone |
+
+The real `%USERPROFILE%\GNUstep\Defaults` (names, sizes, timestamps) and
+`HKCU\Software\GNUstep` (absent) were unchanged from before step 1 to
+after step 7. As any GNUstep app does, Theme Settings saves its own window
+state in its own domain (`org.gnustep.ThemeSettings`); in normal use that
+goes to the user's real defaults.
 
 ## Proposal for 0.1.2
 

@@ -132,11 +132,10 @@ docs changes since 0.1.1. Notes: [release-notes-0.1.2.md](release-notes-0.1.2.md
 
 Before the ask:
 
-- [ ] `packaging/msi/` and the manual `package-msi` workflow on main. This
-      adds a workflow, so it goes in the ask, not under the standing push
-      permission.
-- [ ] winuitheme's Windows check of the installed MSI ([msi.md](msi.md)),
-      after Dan's go for installing it on its host.
+- [x] `packaging/msi/` and the manual `package-msi` workflow on main
+      (`f363602`, Dan's go: ask #7882 (b)).
+- [x] winuitheme's Windows check of the installed MSI ([msi.md](msi.md)):
+      7 of 7 passed on 2026-11-17 (MSI run 44136582495).
 
 At the tagged commit, everything in section 2, and in addition:
 
