@@ -1,8 +1,8 @@
 # Windows MSI: first build (draft)
 
-Status: 2026-11-16. The MSI build lives on the `msi-draft` branch
-(`packaging/msi/`, `.github/workflows/package-msi.yml`), not on main.
-Nothing has been released.
+Status: 2026-11-16. The MSI build is in `packaging/msi/` and the manual
+`package-msi` workflow (`.github/workflows/package-msi.yml`). Nothing has
+been released.
 
 ## The run
 
@@ -75,7 +75,7 @@ before/after comparison from step 2.
 
 ## Proposal for 0.1.2
 
-Merge `packaging/msi/` and the workflow into main (dropping the branch push
-trigger), and attach the MSI to the Theme Settings 0.1.2 release next to
-the AppImage, after the Windows check above. This would be part of the
-0.1.2 release ask; nothing is published before Dan's go.
+With `packaging/msi/` and the manual workflow on main, attach the MSI to
+the Theme Settings 0.1.2 release next to the AppImage, after the Windows
+check above. This would be part of the 0.1.2 release ask; nothing is
+published before Dan's go.
