@@ -123,7 +123,7 @@ The theme-CI snippet stays pinned at v0.1.0: the validator is unchanged in
 
 - [x] Point the theme-CI snippet's `GTS_COMMIT` (examples/ci,
       docs/theme-ci.md) at the tag. Tell adwaita, which pins it in its CI.
-- [x] Set `package-version` back to the next `-dev` version (0.1.1-dev; after 0.1.1, 0.1.2-dev).
+- [x] Set `package-version` back to the next `-dev` version (0.1.1-dev; after 0.1.1, 0.1.2-dev; after 0.1.2, 0.1.3-dev).
 
 ## 0.1.2 (approved by Dan, ask #7954, 2026-11-17)
 
@@ -147,3 +147,21 @@ At the tagged commit, everything in section 2, and in addition:
 Versions: 0.1.2 in the four places in section 1, plus
 `.github/workflows/package-msi.yml` `package-version` and
 `packaging/msi/package.manifest.json` `package.version`.
+
+Released 2026-11-17 as
+[v0.1.2](https://github.com/danjboyd/gnustep-themes/releases/tag/v0.1.2)
+at `2c70c0c`.
+
+| Check | Result |
+|---|---|
+| Linux CI | GitHub CI run 44144736244: success |
+| Local CI | `scripts/ci.sh`: all steps passed, 137 tests, 0 failures |
+| GUI scenarios | `scripts/screenshots.sh` on a private Xvfb: 14 of 14 CHECK lines ok |
+| AppImage build | `package-appimage` run 44144753452: success. `ThemeSettings-0.1.2-x86_64.AppImage`, sha256 `c46c2f993b11531cc50726a2eed12d7a4525c9eced028dcc810b61dc2a580eaa` (the release asset matches) |
+| MSI build | `package-msi` run 44144758013: success, including the packager's install, launch and uninstall smoke test. `ThemeSettings-0.1.2-win64.msi`, sha256 `d27381f9bd330c81c081e451ed41bb5e4ad526220229d6cc08e809faf6c5363c` (the release asset matches) |
+| MSI on Windows | winuitheme's check, 7 of 7 ([msi.md](msi.md)), on the MSI from run 44136582495 at `f363602`; the app code is the same at `2c70c0c` |
+| AppImage test | `packaging/test-appimage.sh`: first launch in a new home OK; Gumdrop offered only via `GTS_HOST_THEME_ROOTS` (control OK); Apply wrote `GSTheme` Adwaita and the purple accent into the scratch home only |
+| Try-safely launcher | normal run 0 (real settings unchanged); isolation-removed control 2 (nothing launched); tamper control 3 |
+| Theme files | Adwaita, Gumdrop, WinUITheme examples and `good.plist`: 0 errors, 0 warnings; bad fixtures rejected |
+
+The theme-CI snippet stays pinned at v0.1.0: the validator is unchanged.
