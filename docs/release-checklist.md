@@ -125,7 +125,7 @@ The theme-CI snippet stays pinned at v0.1.0: the validator is unchanged in
       docs/theme-ci.md) at the tag. Tell adwaita, which pins it in its CI.
 - [x] Set `package-version` back to the next `-dev` version (0.1.1-dev; after 0.1.1, 0.1.2-dev).
 
-## 0.1.2 (draft; needs Dan's go)
+## 0.1.2 (approved by Dan, ask #7954, 2026-11-17)
 
 Proposed contents: the Windows MSI as a second release asset, plus the
 docs changes since 0.1.1. Notes: [release-notes-0.1.2.md](release-notes-0.1.2.md).

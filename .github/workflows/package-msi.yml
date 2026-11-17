@@ -12,7 +12,7 @@ jobs:
     with:
       manifest-path: packaging/msi/package.manifest.json
       backend: msi
-      package-version: 0.1.2-dev
+      package-version: 0.1.2
       msys2-packages: mingw-w64-clang-x86_64-gnutls mingw-w64-clang-x86_64-pkgconf mingw-w64-clang-x86_64-imagemagick
       run-validation: true
       run-smoke: true

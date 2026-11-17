@@ -1,7 +1,6 @@
-# Theme Settings 0.1.2: release notes (draft)
+# Theme Settings 0.1.2: release notes
 
-Draft, not released: nothing is tagged or published before Dan's go. Checks
-run at the tagged commit will be recorded in
+Tag `v0.1.2`. Checks run at the tagged commit are recorded in
 [release-checklist.md](release-checklist.md).
 
 ## What changed since 0.1.1
@@ -9,7 +8,8 @@ run at the tagged commit will be recorded in
 - **Windows installer (preview).** A per-user MSI for Windows x86_64, built
   by the manual `package-msi` workflow with gnustep-packager v0.1.11. It
   carries its own GNUstep runtime (MSYS2 CLANG64). What it has been checked
-  for is in [msi.md](msi.md). It is not code-signed, so Windows SmartScreen
+  for is in [msi.md](msi.md), including a full install, edit and uninstall
+  check on Windows 11. It is not code-signed, so Windows SmartScreen
   warns on first run.
 - **Debian packages.** `gnustep-clang-themesettings`, its libraries and a
   `-dev` package, for Debian trixie on amd64 and arm64, built with clang (user
@@ -30,7 +30,9 @@ from 0.1.1. The library interface version stays 0.
 - **Window style.** The editor window always uses the plain GNUstep look.
 - **Themes need their settings file** (Adwaita alpha24 or later).
 - **Windows MSI:** not signed; no icon of its own (GNUstep's); registry-backed
-  defaults are shown read-only, as in a source build.
+  defaults are shown read-only, as in a source build. Its top-level
+  `ThemeSettings.exe` starts the app and exits, so started from a console it
+  prints nothing.
 
 ## Platforms
 

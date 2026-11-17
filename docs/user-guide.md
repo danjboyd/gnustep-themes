@@ -160,21 +160,33 @@ themes in that GNUstep's `Library/Themes` folders, including
 
 ## Windows (MSI, preview)
 
-A Windows installer has been built but not released; see
-[msi.md](msi.md) for what it has been checked for so far. Until it is
-released, build from source with the recipe in [windows.md](windows.md).
+`ThemeSettings-0.1.2-win64.msi`, attached to the
+[v0.1.2 release](https://github.com/danjboyd/gnustep-themes/releases/tag/v0.1.2),
+installs Theme Settings for your Windows account only (no administrator
+rights), with its own GNUstep runtime, and adds a Start menu shortcut
+"Theme Settings". Check it against the sha256 given on the release page.
+
+- It isn't code-signed, so Windows SmartScreen warns the first time you run
+  it.
+- It lists the themes in your `GNUstep\Library\Themes` folder and edits
+  your GNUstep defaults, as on Linux (see "What Apply writes" below). It
+  bundles no themes.
+- Uninstall it from Windows Settings, Apps.
+
+What it was checked for is in [msi.md](msi.md). To build from source
+instead, use the recipe in [windows.md](windows.md).
 
 ## Install and run the AppImage
 
 Theme Settings is also built as a single-file AppImage for Linux (x86_64),
 with its own GNUstep runtime.
 
-1. **Download** `ThemeSettings-0.1.1-x86_64.AppImage` from the
-   [v0.1.1 release](https://github.com/danjboyd/gnustep-themes/releases/tag/v0.1.1)
+1. **Download** `ThemeSettings-0.1.2-x86_64.AppImage` from the
+   [v0.1.2 release](https://github.com/danjboyd/gnustep-themes/releases/tag/v0.1.2)
    and check it against the sha256 given there. With the GitHub CLI:
 
    ```sh
-   gh release download v0.1.1 -R danjboyd/gnustep-themes -D ThemeSettings-appimage
+   gh release download v0.1.2 -R danjboyd/gnustep-themes -p '*.AppImage' -D ThemeSettings-appimage
    ```
 
    Builds newer than the release come from the manual `package-appimage`

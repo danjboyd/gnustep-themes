@@ -6,7 +6,7 @@ include ../gts-config.make
 # stay out of the library; the standalone app and DemoNotes keep compiling
 # their own copies from source (their build is unchanged).
 LIBRARY_NAME = libThemeSettingsUI
-VERSION = 0.1.1
+VERSION = 0.1.2
 libThemeSettingsUI_OBJC_FILES = GTSThemeSettingsEditor.m
 libThemeSettingsUI_HEADER_FILES = ThemeSettingsUI.h GTSThemeSettingsEditor.h
 libThemeSettingsUI_HEADER_FILES_INSTALL_DIR = ThemeSettingsUI
