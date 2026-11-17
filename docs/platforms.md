@@ -78,10 +78,30 @@ before editing there.
 6. WinUITheme's native-dialog keys only do anything on Windows. The
    editor already shows the owner's help text; whether it applies there is
    not verified.
-Until the rerun passes, `isBackendWritable` (and `isBackendSupported`)
-is NO on Windows unless `GTS_ENABLE_WINDOWS_WRITES=1` is set, and always
-NO on Cygwin, so commits fail with `GTSErrorUnsupportedBackend`. The
-opt-in write path (windows.md section 6) is **pending winuitheme rerun**.
+The write path passed winuitheme's rerun on Windows 11 (windows.md 6.1,
+2026-11-15), and since `7ca155e` editing is on by default for the file
+backend; `GTS_ENABLE_WINDOWS_WRITES=0` turns it off. It is always off for a
+registry-backed configuration and on Cygwin, where commits fail with
+`GTSErrorUnsupportedBackend`. The installed MSI passed the same checks on
+2026-11-17 ([msi.md](msi.md)).
+
+## Downloads and packages (as of 0.1.2)
+
+The editor's code is the same in all of them; they differ in what they
+carry and where they look.
+
+| | AppImage | Windows MSI | Debian packages |
+|---|---|---|---|
+| Version | 0.1.2 (release asset) | 0.1.2 (release asset) | 0.1.1-1 (no 0.1.2 build yet; the app code is unchanged) |
+| Platforms | Linux x86_64 | Windows x86_64 | Debian trixie amd64, arm64 |
+| GNUstep runtime | its own (gnustep-cli-new) | its own (MSYS2 CLANG64) | the apt repository's clang-built GNUstep |
+| Theme folders listed | a fixed list of usual folders plus `GTS_HOST_THEME_ROOTS` (user guide) | the user's `GNUstep\Library\Themes` | that GNUstep's `Library/Themes` folders, user first |
+| Libraries for embedding | no | no | yes (`-dev` package) |
+| Signed | no | no (SmartScreen warns) | by the apt repository |
+| Built by | `package-appimage` workflow | `package-msi` workflow | apt_portstree, built and published by adwaita |
+
+Open differences: the Debian packages trail the release by one version;
+the MSI is unsigned and has no icon of its own; macOS has no package.
 
 ## macOS: requirements before enabling
 

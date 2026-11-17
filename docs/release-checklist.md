@@ -11,7 +11,10 @@ schema v1, as a source tag plus a Linux x86_64 AppImage.
 
 ## 1. Versions agree
 
-Set the same version in all four places, in one commit on main:
+Set the same version in all of these places, in one commit on main (from
+0.1.2 also `ThemeSettingsUI/GNUmakefile` `VERSION`,
+`packaging/msi/package.manifest.json` and
+`.github/workflows/package-msi.yml`; see the 0.1.2 section):
 
 - [ ] `ThemeSettingsKit/GNUmakefile` `VERSION` (now 0.1.0; shared library
       version 0).

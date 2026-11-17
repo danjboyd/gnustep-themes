@@ -1,10 +1,13 @@
-# Windows MSI: first build (draft)
+# Windows MSI
 
-Status: 2026-11-16. The MSI build is in `packaging/msi/` and the manual
-`package-msi` workflow (`.github/workflows/package-msi.yml`). Nothing has
-been released.
+Status: released with 0.1.2 on 2026-11-17
+([v0.1.2](https://github.com/danjboyd/gnustep-themes/releases/tag/v0.1.2),
+`ThemeSettings-0.1.2-win64.msi`, `package-msi` run 44144758013). The build
+is `packaging/msi/` and the manual `package-msi` workflow
+(`.github/workflows/package-msi.yml`). The release checks are in
+[release-checklist.md](release-checklist.md).
 
-## The run
+## The first run (2026-11-16)
 
 | | |
 |---|---|
@@ -95,9 +98,8 @@ after step 7. As any GNUstep app does, Theme Settings saves its own window
 state in its own domain (`org.gnustep.ThemeSettings`); in normal use that
 goes to the user's real defaults.
 
-## Proposal for 0.1.2
+## 0.1.2
 
-With `packaging/msi/` and the manual workflow on main, attach the MSI to
-the Theme Settings 0.1.2 release next to the AppImage, after the Windows
-check above. This would be part of the 0.1.2 release ask; nothing is
-published before Dan's go.
+Dan approved the plan (ask #7882) and the release (ask #7954). The
+released MSI was built at `2c70c0c`; the Windows check above ran on the
+build from `f363602`, whose app code is the same.

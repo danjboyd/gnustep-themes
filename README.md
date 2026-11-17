@@ -25,7 +25,7 @@ applications or for one application, without editing defaults by hand.
 | `ThemeSettingsDemo/` | An example app that embeds the editor as its own preferences pane. |
 | `Tools/ValidateSchema/` | `gts-validate-schema`, a checker for theme authors and CI. |
 | `examples/` | `ThemeSettings.plist` for Adwaita, WinUITheme and Gumdrop (mirrors of, or drafts for, the theme owners' files). |
-| `docs/` | [User guide](docs/user-guide.md), [end-to-end checks with real themes](docs/end-to-end.md), schema spec, embedding guide, platform notes, Windows audit, [first-release checklist (draft)](docs/release-checklist.md). |
+| `docs/` | [User guide](docs/user-guide.md), [end-to-end checks with real themes](docs/end-to-end.md), schema spec, embedding guide, platform notes, Windows audit, [release checklist](docs/release-checklist.md), [Windows MSI](docs/msi.md). |
 
 ## For theme authors
 
@@ -114,7 +114,9 @@ recipe and the portability audit are in [docs/windows.md](docs/windows.md).
 write read back), tested by winuitheme on Windows 11 on 2026-11-15 (save,
 remove, conflict check). A registry-backed configuration is refused, and
 `GTS_ENABLE_WINDOWS_WRITES=0` turns editing off; see
-[docs/windows.md](docs/windows.md) section 6.1.
+[docs/windows.md](docs/windows.md) section 6.1. From 0.1.2 a Windows
+installer (MSI, preview, not code-signed) is attached to each release; see
+[docs/msi.md](docs/msi.md).
 
 ## Status
 
