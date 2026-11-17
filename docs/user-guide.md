@@ -136,6 +136,34 @@ at the bottom says why:
 * **A theme asks for something this version doesn't understand**: its rows
   are shown read-only, with a note.
 
+## Install from apt (Debian trixie)
+
+Theme Settings is packaged for Debian trixie (amd64 and arm64), built with
+clang, in a private apt repository that also carries a clang-built GNUstep.
+On a machine that uses that repository:
+
+```sh
+sudo apt install gnustep-clang-themesettings
+```
+
+| Package | Contains |
+|---|---|
+| `gnustep-clang-themesettings` | The Theme Settings app |
+| `gnustep-clang-libthemesettings0` | `ThemeSettingsKit` and the embeddable editor view (shared libraries) |
+| `gnustep-clang-libthemesettings-dev` | Headers, for applications that embed the editor |
+
+Version 0.1.1-1. The app pulls in the libraries, and they pull in the
+repository's clang-built GNUstep and libobjc2. The packaged app edits the
+same defaults as the AppImage (see "What Apply writes" below) and lists the
+themes in that GNUstep's `Library/Themes` folders, including
+`~/GNUstep/Library/Themes`.
+
+## Windows (MSI, preview)
+
+A Windows installer has been built but not released; see
+[msi.md](msi.md) for what it has been checked for so far. Until it is
+released, build from source with the recipe in [windows.md](windows.md).
+
 ## Install and run the AppImage
 
 Theme Settings is also built as a single-file AppImage for Linux (x86_64),

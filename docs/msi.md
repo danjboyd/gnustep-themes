@@ -29,13 +29,49 @@ Nothing has been released.
 - **The editor's own behaviour from the MSI:** listing themes, reading and
   saving defaults, the conflict check. The source build passed these on
   Windows 11 ([windows.md](windows.md) 6.1); the MSI build hasn't been
-  through them. winuitheme could run section 6 against an installed MSI on
-  its Windows host, with Dan's go (it installs software there).
+  through them. The steps for winuitheme are in "Windows check of the
+  installed MSI" below; running them needs Dan's go (it installs software).
 - **Themes:** the MSI bundles none. Which theme folders it lists on Windows
   (the user's `GNUstep\Library\Themes`; WinUITheme installs) is not yet
   confirmed.
 - **Not signed.** Windows SmartScreen will warn on first run.
 - **No icon of its own:** GNUstep's icon, as in the AppImage.
+
+## Windows check of the installed MSI (for winuitheme; needs Dan's go)
+
+Not run yet. Installing the MSI puts software on the Windows host, so
+winuitheme runs this only after Dan says yes. Use the workflow artifact
+named above, and check its sha256 first.
+
+1. **Install** `ThemeSettings-*-win64.msi` per-user
+   (`msiexec /i <file> /qn /l*v install.log`). Expect
+   `%LOCALAPPDATA%\Theme Settings\` with `ThemeSettings.exe` and a Start
+   menu shortcut named "Theme Settings", and no administrator prompt.
+2. **Isolate before every launch**, as in [windows.md](windows.md) 6.1:
+   `HOMEDRIVE`/`HOMEPATH`, `GNUSTEP_HOME` and `GNUSTEP_USER_ROOT` point at a
+   private home, with `GNUSTEP_CONFIG_FILE` and `GNUSTEP_PATHLIST` unset.
+   Run the MSI's own `runtime\bin\defaults.exe` with that environment and
+   confirm it reads the private `GNUstep\Defaults`; stop if it doesn't. The
+   MSI carries its own `runtime\bin\GNUstep.conf`, so this probe is what
+   proves the isolation, not the variables alone. Record the real
+   `GNUstep\Defaults` and `HKCU\Software\GNUstep` before and after.
+3. **Startup line.** Start the installed `ThemeSettings.exe` from a shell
+   so stderr is visible. The defaults-root line names the private home and
+   ends "readable, writable".
+4. **Themes listed.** Copy `examples/*.theme` into the private home's
+   `GNUstep\Library\Themes`. All three appear in the Theme menu. Note any
+   other folders listed (an installed WinUITheme, the MSI's own runtime).
+5. **Section 6, steps 2-4,** against the installed app, driven with
+   `-GTSScript` on a throwaway domain (DemoNotes, as in 6.1): write, remove,
+   conflict. Same pass criteria as 6.1.
+6. **Shortcut launch.** Start it once from the Start menu shortcut and close
+   it; it opens with the plain GNUstep look.
+7. **Uninstall** (`msiexec /x <file> /qn`). `%LOCALAPPDATA%\Theme Settings`
+   and the shortcut are gone. The real defaults and registry are unchanged
+   from step 2.
+
+Report: the MSI's sha256, Windows build, each step's result, and the
+before/after comparison from step 2.
 
 ## Proposal for 0.1.2
 

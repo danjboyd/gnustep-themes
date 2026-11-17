@@ -124,3 +124,27 @@ The theme-CI snippet stays pinned at v0.1.0: the validator is unchanged in
 - [x] Point the theme-CI snippet's `GTS_COMMIT` (examples/ci,
       docs/theme-ci.md) at the tag. Tell adwaita, which pins it in its CI.
 - [x] Set `package-version` back to the next `-dev` version (0.1.1-dev; after 0.1.1, 0.1.2-dev).
+
+## 0.1.2 (draft; needs Dan's go)
+
+Proposed contents: the Windows MSI as a second release asset, plus the
+docs changes since 0.1.1. Notes: [release-notes-0.1.2.md](release-notes-0.1.2.md).
+
+Before the ask:
+
+- [ ] `packaging/msi/` and the manual `package-msi` workflow on main. This
+      adds a workflow, so it goes in the ask, not under the standing push
+      permission.
+- [ ] winuitheme's Windows check of the installed MSI ([msi.md](msi.md)),
+      after Dan's go for installing it on its host.
+
+At the tagged commit, everything in section 2, and in addition:
+
+| Check | How | Evidence to record |
+|---|---|---|
+| MSI build | manual `package-msi` run at that commit (packager validation, install/launch/uninstall smoke) | run id, MSI sha256 |
+| MSI on Windows | winuitheme's run of the msi.md check, against that MSI or one from the same app code | report id |
+
+Versions: 0.1.2 in the four places in section 1, plus
+`.github/workflows/package-msi.yml` `package-version` and
+`packaging/msi/package.manifest.json` `package.version`.
