@@ -25,7 +25,7 @@ applications or for one application, without editing defaults by hand.
 | `ThemeSettingsDemo/` | An example app that embeds the editor as its own preferences pane. |
 | `Tools/ValidateSchema/` | `gts-validate-schema`, a checker for theme authors and CI. |
 | `examples/` | `ThemeSettings.plist` for Adwaita, WinUITheme and Gumdrop (mirrors of, or drafts for, the theme owners' files). |
-| `docs/` | [User guide](docs/user-guide.md), [end-to-end checks with real themes](docs/end-to-end.md), schema spec, embedding guide, platform notes, Windows audit, [release checklist](docs/release-checklist.md), [Windows MSI](docs/msi.md). |
+| `docs/` | [User guide](docs/user-guide.md), [end-to-end checks with real themes](docs/end-to-end.md), schema spec, embedding guide, platform notes, Windows audit, [release checklist](docs/release-checklist.md), [Windows MSI](docs/msi.md), [theme-author guide](docs/theme-authors.md), [live-apply design note](docs/live-apply.md). |
 
 ## For theme authors
 
