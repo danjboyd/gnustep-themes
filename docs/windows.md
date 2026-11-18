@@ -58,6 +58,10 @@ cd gnustep-themes        # a checkout at the commit named in the report
 make -C Tools/ValidateSchema
 Tools/ValidateSchema/obj/gts-validate-schema path/to/WinUITheme.theme examples/*.theme
 #    expect "0 error(s), 0 warning(s)" for each; exit status 0
+#    (scripts/validate-theme.sh may first print "NSHomeDirectoryForUser(...)
+#    failed." a few times: gnustep-base looks up the account's home even
+#    with GNUSTEP_HOME set. Harmless; the result line and exit status count.
+#    Seen by winuitheme on 2026-11-18 at 54d364a.)
 
 # 2. The libraries (DLL + import library in each obj/)
 make
