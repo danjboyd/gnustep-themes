@@ -35,18 +35,55 @@ label(NSString *text, float size, BOOL bold, NSColor *color)
   return t;
 }
 
-/* Height a wrapping label needs at a given width (rough but stable). */
+/* Text sizes follow the user's system font sizes (NSFontSize and
+   NSSmallFontSize, or the theme's), not fixed points. With GNUstep's
+   defaults (12 and 10) they are the sizes the editor always used. */
+static float textSize(void) { return [NSFont systemFontSize]; }
+static float smallSize(void) { return [NSFont smallSystemFontSize]; }
+static float headingSize(void) { return textSize() + 1; }
+static float messageSize(void) { return smallSize() + 1; }
+/* Height of a one-line label at size, never less than the old fixed height. */
+static float lineHeight(float size, float minimum)
+{
+  float h = size + 6;
+  return h > minimum ? h : minimum;
+}
+/* Secondary text (state lines, notes, the message) uses the theme's colour
+   for dimmed text, so it stays readable in a dark host theme. In the plain
+   GNUstep look it is the dark grey used before. */
+static NSColor *secondaryColor(void) { return [NSColor disabledControlTextColor]; }
+
+/* Height a wrapping label needs at a given width. Simulates greedy word
+   wrapping with the label's font, so that a long unbroken word (a path)
+   that wraps mid-word still gets its lines, at any font size. */
 static float
 wrappedHeight(NSString *text, float width, float size)
 {
-  NSDictionary *a = [NSDictionary dictionaryWithObject: [NSFont systemFontOfSize: size]
-                                                forKey: NSFontAttributeName];
+  NSFont *f = [NSFont systemFontOfSize: size];
+  /* The cell wraps a little before its full width (insets, padding), and
+     a line that only just fits is better counted twice than clipped. */
+  float room = (width - 12) * 0.95, space = [f widthOfString: @" "];
+  float lineH = [f defaultLineHeightForFont];
   NSEnumerator *e = [[text componentsSeparatedByString: @"\n"] objectEnumerator];
   NSString *para;
   int lines = 0;
+  if (lineH < size + 5) lineH = size + 5;
   while ((para = [e nextObject]) != nil)   /* each paragraph wraps on its own */
-    lines += (int)([para sizeWithAttributes: a].width / (width - 8)) + 1;
-  return lines * (size + 5) + 2;
+    {
+      NSEnumerator *we = [[para componentsSeparatedByString: @" "] objectEnumerator];
+      NSString *word;
+      float x = 0;
+      lines++;
+      while ((word = [we nextObject]) != nil)
+        {
+          float w = [f widthOfString: word];
+          if (x > 0 && x + space + w > room) { lines++; x = 0; }
+          else if (x > 0) x += space;
+          while (w > room) { lines++; w -= room; }   /* broken mid-word */
+          x += w;
+        }
+    }
+  return lines * lineH + 2;
 }
 
 @interface GTSThemeSettingsEditor (Private)
@@ -84,7 +121,7 @@ wrappedHeight(NSString *text, float width, float size)
   [_scroll setDocumentView: _content];
   [_view addSubview: _scroll];
 
-  _message = [label(@"", 11, NO, [NSColor darkGrayColor]) retain];
+  _message = [label(@"", messageSize(), NO, secondaryColor()) retain];
   [[_message cell] setWraps: YES];
   [_message setFrame: NSMakeRect(kMargin, 4, frame.size.width - 300, 56)];
   [_message setAutoresizingMask: NSViewWidthSizable | NSViewMaxYMargin];
@@ -174,14 +211,14 @@ static NSString *fittedTitle(NSString *title, NSFont *font, float room);
     [v removeFromSuperview];
 
   /* Target */
-  t = label([NSString stringWithFormat: @"Settings for: %@", [_model targetTitle]], 13, YES, nil);
-  [t setFrame: NSMakeRect(kMargin, y, width - 2 * kMargin, 20)];
+  t = label([NSString stringWithFormat: @"Settings for: %@", [_model targetTitle]], headingSize(), YES, nil);
+  [t setFrame: NSMakeRect(kMargin, y, width - 2 * kMargin, lineHeight(headingSize(), 20))];
   [_content addSubview: t];
-  y += 30;
+  y += lineHeight(headingSize(), 20) + 10;
 
   /* Theme selection (independent of every setting) */
-  t = label(@"Theme", 12, YES, nil);
-  [t setFrame: NSMakeRect(kMargin, y + 3, kLabelW, 20)];
+  t = label(@"Theme", textSize(), YES, nil);
+  [t setFrame: NSMakeRect(kMargin, y + 3, kLabelW, lineHeight(textSize(), 20))];
   [_content addSubview: t];
   p = [self popupWithChoices: [_model themeChoices] selected: [_model selectedThemeIndex]
                        frame: NSMakeRect(x2, y, kControlW, 26)];
@@ -192,18 +229,18 @@ static NSString *fittedTitle(NSString *title, NSFont *font, float room);
   [_content addSubview: p];
   {
     /* Seeded-theme states can be a sentence or two: wrap, don't clip. */
-    float h = wrappedHeight([_model themeStateText], kControlW + kResetW, 10);
-    t = label([_model themeStateText], 10, NO, [NSColor grayColor]);
+    float h = wrappedHeight([_model themeStateText], kControlW + kResetW, smallSize());
+    t = label([_model themeStateText], smallSize(), NO, secondaryColor());
     [[t cell] setWraps: YES];
     [t setFrame: NSMakeRect(x2, y + 27, kControlW + kResetW, h)];
     [_content addSubview: t];
-    y += 30 + (h > 16 ? h : 16);
+    y += 30 + (h > lineHeight(smallSize(), 16) ? h : lineHeight(smallSize(), 16));
   }
   note = [_model themeNote];
   if ([note length] > 0)
     {
-      float h = wrappedHeight(note, width - x2 - kMargin, 10);
-      t = label(note, 10, NO, [NSColor darkGrayColor]);
+      float h = wrappedHeight(note, width - x2 - kMargin, smallSize());
+      t = label(note, smallSize(), NO, secondaryColor());
       [[t cell] setWraps: YES];
       [t setFrame: NSMakeRect(x2, y, width - x2 - kMargin, h)];
       [_content addSubview: t];
@@ -223,8 +260,8 @@ static NSString *fittedTitle(NSString *title, NSFont *font, float room);
       [_content addSubview: b];
       y += 24;
       note = [_model followSystemNote];
-      h = wrappedHeight(note, width - x2 - kMargin, 10);
-      t = label(note, 10, NO, [NSColor darkGrayColor]);
+      h = wrappedHeight(note, width - x2 - kMargin, smallSize());
+      t = label(note, smallSize(), NO, secondaryColor());
       [[t cell] setWraps: YES];
       [t setFrame: NSMakeRect(x2, y, width - x2 - kMargin, h)];
       [_content addSubview: t];
@@ -247,8 +284,8 @@ static NSString *fittedTitle(NSString *title, NSFont *font, float room);
       BOOL rowEditable = editable && ![row isReadOnly];
       NSButton *reset;
 
-      t = label([row title], 12, NO, nil);
-      [t setFrame: NSMakeRect(kMargin, y + 3, kLabelW, 20)];
+      t = label([row title], textSize(), NO, nil);
+      [t setFrame: NSMakeRect(kMargin, y + 3, kLabelW, lineHeight(textSize(), 20))];
       [_content addSubview: t];
 
       if ([row isFreeForm])
@@ -282,14 +319,14 @@ static NSString *fittedTitle(NSString *title, NSFont *font, float room);
       [reset setEnabled: rowEditable && [row canReset]];
       [_content addSubview: reset];
 
-      t = label([row stateText], 10, NO, [NSColor grayColor]);
-      [t setFrame: NSMakeRect(x2, y + 27, kControlW + kResetW, 16)];
+      t = label([row stateText], smallSize(), NO, secondaryColor());
+      [t setFrame: NSMakeRect(x2, y + 27, kControlW + kResetW, lineHeight(smallSize(), 16))];
       [_content addSubview: t];
-      y += 44;
+      y += 28 + lineHeight(smallSize(), 16);
       if ([[row note] length] > 0)
         {
-          float h = wrappedHeight([row note], width - x2 - kMargin, 10);
-          t = label([row note], 10, NO, [NSColor darkGrayColor]);
+          float h = wrappedHeight([row note], width - x2 - kMargin, smallSize());
+          t = label([row note], smallSize(), NO, secondaryColor());
           [[t cell] setWraps: YES];
           [t setFrame: NSMakeRect(x2, y, width - x2 - kMargin, h)];
           [_content addSubview: t];
@@ -425,6 +462,34 @@ fieldText(NSTextField *f)
     {
       if (![c isEnabled]) return NO;
       [(NSButton*)c performClick: self];
+      return YES;
+    }
+  if ([verb isEqual: @"fonts"])
+    {
+      /* Test hook: the smallest and largest label sizes, and whether every
+         label without the normal text colour uses the secondary colour. */
+      NSMutableArray *labels = [NSMutableArray arrayWithObject: _message];
+      NSEnumerator *e = [[_content subviews] objectEnumerator];
+      NSView *v;
+      float lo = 1000, hi = 0;
+      BOOL themed = YES;
+      while ((v = [e nextObject]) != nil)
+        if ([v isKindOfClass: [NSTextField class]] && ![(NSTextField*)v isEditable])
+          [labels addObject: v];
+      e = [labels objectEnumerator];
+      while ((v = [e nextObject]) != nil)
+        {
+          NSTextField *f = (NSTextField*)v;
+          NSColor *c = [f textColor];
+          float size = [[f font] pointSize];
+          if (size < lo) lo = size;
+          if (size > hi) hi = size;
+          if (c != nil && ![c isEqual: [NSColor controlTextColor]]
+              && ![c isEqual: [NSColor textColor]] && ![c isEqual: secondaryColor()])
+            themed = NO;
+        }
+      fprintf(stderr, "script: fonts: smallest=%g largest=%g system=%g small=%g colours=%s\n",
+              lo, hi, textSize(), smallSize(), themed ? "theme" : "fixed");
       return YES;
     }
   if ([verb isEqual: @"theme"] && [w count] == 2)

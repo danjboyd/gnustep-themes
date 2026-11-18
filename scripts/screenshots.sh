@@ -408,6 +408,18 @@ run "$DEMO" $X -GTSOpenSettings YES -GTSScript \
   "choose adwaita.header-bar-toolbar YES; apply; log; shot $out/D-pane-live-receipt.png"
 check org.gnustep.themesettings.DemoNotes GnomeThemeHeaderBarToolbar YES "D Apply wrote a live setting"
 
+# P. Text sizes follow the system font sizes, secondary text the theme's
+#    colour (docs/a11y-l10n.md, accessibility 2 and 3). Default sizes first,
+#    then enlarged ones given as arguments (nothing is written).
+run "$APP" $X -GTSScript "fonts"
+run "$APP" $X -GTSTargetApp "$root/apps/Writer.app" -NSFontSize 16 -NSSmallFontSize 14 -GTSScript "fonts; shot $out/P-large-fonts.png"
+fontcheck() {   # expected-line label
+  grep -qF "script: fonts: $1" "$root/apps.log" && echo "CHECK ok: $2 ($1)" \
+    || { echo "CHECK FAILED: $2 (want $1; got: $(grep 'script: fonts:' "$root/apps.log" | tr '\n' ' '))"; checkfail=1; }
+}
+fontcheck "smallest=10 largest=13 system=12 small=10 colours=theme" "P default sizes unchanged"
+fontcheck "smallest=14 largest=17 system=16 small=14 colours=theme" "P sizes follow NSFontSize/NSSmallFontSize"
+
 fi
 # F. free-form field: text typed but not committed must be saved by Apply;
 #    invalid text must block the save (Apply enabled by typing alone).
