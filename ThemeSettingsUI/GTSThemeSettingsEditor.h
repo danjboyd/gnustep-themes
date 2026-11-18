@@ -45,7 +45,9 @@
 /* Drives the editor's own controls the way a user would, for scripted
    screenshots and GUI checks. Actions: "choose <settingId> <value>",
    "type <settingId> <text>" (types into the field, does NOT commit),
-   "reset <settingId>", "theme <name>", "apply", "cancel", "reload".
-   Returns NO if the control is missing or disabled. */
+   "reset <settingId>", "theme <name>", "follow on|off", "apply",
+   "cancel", "reload", and "fonts" (logs label sizes and colours).
+   Returns NO if the control is missing or disabled. For tests only; the
+   verbs may change (docs/api-stability.md). */
 - (BOOL) performScriptedAction: (NSString*)action;
 @end
