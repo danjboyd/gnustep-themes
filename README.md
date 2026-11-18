@@ -29,7 +29,8 @@ applications or for one application, without editing defaults by hand.
 
 ## For theme authors
 
-Add `Resources/ThemeSettings.plist` to your `.theme` bundle. A minimal
+Step-by-step guide: [docs/theme-authors.md](docs/theme-authors.md). In
+short, add `Resources/ThemeSettings.plist` to your `.theme` bundle. A minimal
 example with one setting:
 
 ```

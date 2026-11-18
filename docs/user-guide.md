@@ -266,6 +266,7 @@ This view never changes anything.
 ## For theme authors
 
 To make your theme's settings appear here, add a `ThemeSettings.plist` to
-the theme bundle: see the [README](../README.md) and
+the theme bundle: see [theme-authors.md](theme-authors.md), the
+[README](../README.md) and
 [schema-v1.md](schema-v1.md), and check it with
 `scripts/validate-theme.sh`.
