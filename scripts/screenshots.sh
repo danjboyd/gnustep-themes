@@ -14,6 +14,9 @@
 #   =I only the installed-library smoke: Kit/UI staged into a prefix inside
 #      the scratch root (make install DESTDIR=...), Tests/ExternalHost built
 #      out of tree against it, link/runtime receipts, one Apply on Xvfb.
+#   =M whether a running app switches theme when GSTheme changes in its
+#      defaults from outside (docs/live-apply.md): a control app that pins
+#      nothing must switch; Theme Settings, which pins its own, must not.
 #   =O whether the REAL Adwaita theme follows GNOME by itself (GTS_E2E_THEMES).
 #   =J end to end with the REAL Adwaita theme: GTS_E2E_THEMES=<dir holding a
 #      built Adwaita.theme>, copied into the isolated user's Library/Themes;
@@ -105,9 +108,11 @@ home=$("$here/Tests/RootProbe/obj/gts-root-probe" -home)
 case "$home" in "$root"/*) ;; *)
   strings "$plib" 2>/dev/null | grep -qx GNUSTEP_HOME && fail "GNUstep home $home not isolated; refusing"
   echo "screenshots: note: gnustep-base ignores GNUSTEP_HOME (home $home)" ;; esac
+lib=$("$here/Tests/RootProbe/obj/gts-root-probe" -library)
+case "$lib" in "$root"/*) ;; *) fail "user Library $lib not isolated; refusing" ;; esac
 DEFAULTS=${GTS_DEFAULTS_TOOL:-/usr/bin/defaults}
 [ "$plib" = "$(ldd "$DEFAULTS" | awk '/libgnustep-base/{print $3}')" ] || fail "defaults tool uses another gnustep-base"
-echo "screenshots: defaults root $resolved (isolated)"
+echo "screenshots: defaults root $resolved, user Library $lib (isolated)"
 
 # Seed a realistic state through the defaults tool (verified above).
 D() { "$DEFAULTS" "$@" >/dev/null; }
@@ -289,6 +294,40 @@ if [ "${GTS_SHOTS_ONLY:-}" = L ]; then
   grep -h "^script:" "$root/apps.log" || true
   ls "$out"
   [ "$checkfail" -eq 0 ] || fail "read-back checks failed"
+  exit 0
+fi
+
+# M. Live GSTheme. libs-gui only watches GSTheme once it has activated a
+#    theme other than the default (+[GSTheme setTheme:] adds the observer),
+#    so both apps start with GSTheme Gumdrop set for all applications (the
+#    example bundles: settings file only, no code, in the isolated user's
+#    Library/Themes). 5 s in, GSTheme WinUITheme is written to
+#    NSGlobalDomain from outside, as a global Apply would. gnustep-base
+#    re-reads its defaults every 30 s, so within about 30 s the control
+#    (pins nothing) must log the switch. Theme Settings pins its own theme:
+#    it must start and stay with GNUstep.
+if [ "${GTS_SHOTS_ONLY:-}" = M ]; then
+  make -s -C "$here/Tests/ThemeProbe" messages=no >/dev/null || fail "theme probe build failed"
+  mkdir -p "$lib/Themes"
+  cp -R "$here/examples/Gumdrop.theme" "$here/examples/WinUITheme.theme" "$lib/Themes/"
+  D write NSGlobalDomain GSTheme Gumdrop
+  timeout 50 "$here/Tests/ThemeProbe/obj/gts-theme-probe" -GTSProbeSeconds 45 >"$root/probe.log" 2>&1 &
+  pp=$!
+  timeout 45 "$APP" >"$root/app.log" 2>&1 &
+  pa=$!
+  sleep 5
+  D write NSGlobalDomain GSTheme WinUITheme
+  check NSGlobalDomain GSTheme WinUITheme "M global theme changed"
+  wait "$pp" "$pa" || true
+  grep -h "probe:" "$root/probe.log" || true
+  grep -h "window theme" "$root/app.log" || true
+  if grep -q "probe: started with theme Gumdrop" "$root/probe.log" && grep -q "probe: theme now WinUITheme" "$root/probe.log"
+  then echo "CHECK ok: M control app started with Gumdrop and switched to WinUITheme while running"
+  else echo "CHECK FAILED: M control app did not start with Gumdrop and switch (the test cannot show anything)"; checkfail=1; fi
+  if grep -q "window theme: GNUstep" "$root/app.log" && ! grep -q "window theme changed" "$root/app.log"; then
+    echo "CHECK ok: M Theme Settings started with and kept the GNUstep look"
+  else echo "CHECK FAILED: M Theme Settings did not keep the GNUstep look"; checkfail=1; fi
+  [ "$checkfail" -eq 0 ] || fail "live theme checks failed"
   exit 0
 fi
 

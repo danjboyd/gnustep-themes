@@ -813,6 +813,14 @@ static NSString *const kAccentKey = @"GnomeThemeAccentColor";
       else
         m = @"Saved. Running applications that watch these settings may update; "
             @"a restart is the guaranteed way to see them.";
+      /* Measured (docs/live-apply.md): a running app that already uses a
+         theme re-reads its defaults within about 30 s and libs-gui
+         switches GSTheme live, often incompletely. Other settings keep
+         their own Apply requirement. */
+      if ([[r committedChanges] objectForKey: @"GSTheme"] != nil)
+        m = [m stringByAppendingString: @" Running applications that already use a theme may "
+          @"switch to the new theme by themselves, usually within about 30 seconds, but may "
+          @"not redraw everything until they restart."];
       if ([r refreshFailed])
         m = [m stringByAppendingFormat: @" However, the settings could not be re-read (%@); "
           @"reload before changing anything else. Do not save the same change again.",
