@@ -1,7 +1,7 @@
 # Library interfaces before 1.0
 
-Status: a proposal (2026-11-18), against `main` at `a417ac7`. Nothing is
-frozen yet. Both libraries are interface version 0 (`libThemeSettingsKit.so.0`,
+Status: a proposal (2026-11-18), against `main` at `a417ac7`; section 2 is
+the 1.0 candidate (lead, 2026-11-19). Nothing is frozen yet. Both libraries are interface version 0 (`libThemeSettingsKit.so.0`,
 `libThemeSettingsUI.so.0`, version 0.1.2), and the release notes say
 interfaces may change. This note says what a `.so.1` should promise, what it
 shouldn't, and what has to change in the code first.
@@ -123,14 +123,44 @@ reads its `@public` ivars.
 Steps 1, 3 and 5 change no behaviour, and the unit tests and scenario I
 cover them. Step 6 needs a CI change, so it needs Dan's go.
 
-## 4. Questions to settle first
+## 4. Decisions so far, and what's open
 
-- **Is the tier list right?** In particular, should `GTSSchemaValidator`
-  be stable for theme authors who want to validate from their own tools,
-  or is the command line enough?
-- **Does SystemPreferences (embedding.md section 2) need anything beyond
-  the embedding contract?** If a pane is planned before 1.0, its needs
-  should shape the stable tier.
+**Decided (gnustep-tools-lead, 2026-11-19):**
+
+- The stable tier in section 2 is the **1.0 candidate**.
+- `GTSSchemaValidator` **stays provisional** until a binary consumer needs
+  it. Theme authors use the command line.
+- The stable tier grows only from **recorded requirements**: ThemeDemo now,
+  and SystemPreferences once its needs are written down.
+
+**ThemeDemo against the candidate (source check, 2026-11-19).** Adwaita's
+`Examples/ThemeDemo/ThemeDemoSettingsPanel.m` (plugins-themes-adwaita at
+`c6aeff2`) calls only:
+
+- `GTSDefaultsDomainStore -initWithHostDefaults:`;
+- `GTSThemeCatalog -init`;
+- `GTSEditorModel -initWithStore:catalog:`, `-setHostDomain:`,
+  `-setTargetApplicationDomain:displayName:info:`, `-setTargetGlobal`,
+  `-hasChanges`, `-targetTitle`;
+- `GTSThemeSettingsEditor -initWithModel:`, `-view`, `-setDelegate:`,
+  `-reloadFromModel`;
+- both delegate methods, and `GTSApplyOutcome -kind`, `-didWrite`,
+  `-needsReload`;
+- `-performScriptedAction:`, for its own GUI checks only.
+
+Everything except `-performScriptedAction:` is in the stable tier, and
+ThemeDemo uses that one the way section 2 describes (tests). So the
+candidate covers ThemeDemo without growing. One gap: `GTSThemeCatalog`
+doesn't declare `-init` in its header (it's inherited from `NSObject`, and
+overridden in the `.m`). The stable header should declare it. This was a
+source check; a run of ThemeDemo against a rebuilt library is still to
+come.
+
+**Open:**
+
+- **SystemPreferences requirements.** Nothing is written yet
+  (embedding.md section 2 is a plan, with no pane). Record what a pane
+  needs before adding anything to the stable tier for it.
 - **Debian packaging:** a `.so.1` means a new binary package name
   (`libthemesettingskit1`). Coordinate the timing with whoever owns the
   Debian packages.
