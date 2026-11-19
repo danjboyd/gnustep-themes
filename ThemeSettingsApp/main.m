@@ -1,5 +1,6 @@
 /* Theme Settings - standalone configurator: global or one application. */
 #import <AppKit/AppKit.h>
+#import <GNUstepGUI/GSTheme.h>
 #import "GTSThemeSettingsEditor.h"
 #import "GTSEditorModel.h"
 #import "GTSDefaultsDomainStore.h"
@@ -52,6 +53,11 @@
   return [[[GTSThemeCatalog alloc] initWithSearchRoots: roots] autorelease];
 }
 
+- (void) themeActivated: (NSNotification*)n
+{
+  NSLog(@"Theme Settings window theme changed to: %@", [[GSTheme theme] name]);
+}
+
 - (void) applicationDidFinishLaunching: (NSNotification*)n
 {
   NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
@@ -64,6 +70,9 @@
   _model = [[GTSEditorModel alloc] initWithStore: [[[GTSDefaultsDomainStore alloc] init] autorelease]
                                          catalog: [self catalog]];
   NSLog(@"%@", [_model diagnostics]);   /* which defaults root, read/write state */
+  NSLog(@"Theme Settings window theme: %@", [[GSTheme theme] name]);
+  [[NSNotificationCenter defaultCenter] addObserver: self selector: @selector(themeActivated:)
+                                               name: GSThemeDidActivateNotification object: nil];
   _editor = [[GTSThemeSettingsEditor alloc] initWithModel: _model];
 
   _window = [[NSWindow alloc] initWithContentRect: frame
@@ -206,13 +215,38 @@
 - (BOOL) applicationShouldTerminateAfterLastWindowClosed: (id)sender { return YES; }
 @end
 
+/* The editor window always uses the plain GNUstep look. libs-gui switches
+   a running app's theme when GSTheme changes in its defaults (it re-reads
+   them every 30 s), so applying a global theme would otherwise restyle this
+   window too. An explicit -GSTheme argument still wins. The packaged
+   launchers pass -GSTheme GNUstep as well; see docs/live-apply.md. */
+static void
+pinOwnTheme(void)
+{
+  NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
+  NSDictionary *args = [d volatileDomainForName: NSArgumentDomain];
+  NSMutableDictionary *m;
+
+  if ([args objectForKey: @"GSTheme"] != nil)
+    return;
+  m = args ? [[args mutableCopy] autorelease] : [NSMutableDictionary dictionary];
+  [m setObject: @"GNUstep" forKey: @"GSTheme"];
+  [d removeVolatileDomainForName: NSArgumentDomain];
+  [d setVolatileDomain: m forName: NSArgumentDomain];
+}
+
 int
 main(int argc, const char **argv)
 {
   NSAutoreleasePool *pool = [NSAutoreleasePool new];
-  NSApplication *app = [NSApplication sharedApplication];
-  GTSConfigurator *c = [GTSConfigurator new];
-  NSMenu *menu = [[NSMenu new] autorelease];
+  NSApplication *app;
+  GTSConfigurator *c;
+  NSMenu *menu;
+
+  pinOwnTheme();
+  app = [NSApplication sharedApplication];
+  c = [GTSConfigurator new];
+  menu = [[NSMenu new] autorelease];
   [menu addItemWithTitle: @"Quit" action: @selector(terminate:) keyEquivalent: @"q"];
   [app setMainMenu: menu];
   [app setDelegate: c];

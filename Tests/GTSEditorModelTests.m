@@ -84,6 +84,27 @@
     @"editing an app never touches global");
 }
 
+- (void) testThemeChangeReceiptMentionsLiveSwitchOnlyForTheme
+{
+  GTSSettingRow *row = [self rowNamed: @"gumdrop.menu-style"];
+  NSUInteger primary = [[[row choices] valueForKey: @"value"] indexOfObject: @"primary"];
+  XCTAssertTrue([model selectChoiceAtIndex: primary forRow: row]);
+  XCTAssertTrue([model apply]);
+  XCTAssertTrue([[model message] rangeOfString: @"Restart"].location != NSNotFound);
+  XCTAssertTrue([[model message] rangeOfString: @"30 seconds"].location == NSNotFound,
+    @"a restart setting alone says nothing about a live switch");
+
+  [model selectThemeChoiceAtIndex: [[[model themeChoices] valueForKey: @"value"] indexOfObject: @"Adwaita"]];
+  XCTAssertTrue([model apply]);
+  XCTAssertEqualObjects(GTSExternalRead(app, @"GSTheme"), @"Adwaita");
+  XCTAssertTrue([[model message] rangeOfString: @"Restart"].location != NSNotFound,
+    @"a restart is still the promise");
+  XCTAssertTrue([[model message] rangeOfString: @"within about 30 seconds"].location != NSNotFound,
+    @"a theme change warns that running apps may switch by themselves");
+  GTSMustRunDefaults([NSArray arrayWithObjects: @"delete", app, @"GSTheme", nil]);
+  GTSMustRunDefaults([NSArray arrayWithObjects: @"delete", app, @"GumdropMenuStyle", nil]);
+}
+
 - (void) testCancelDropsEverything
 {
   [model selectThemeChoiceAtIndex: [[[model themeChoices] valueForKey: @"value"] indexOfObject: @"Adwaita"]];
